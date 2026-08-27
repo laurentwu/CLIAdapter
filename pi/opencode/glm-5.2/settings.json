@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "opencode",
+  "defaultModel": "glm-5.2",
+  "defaultThinkingLevel": "high"
+}

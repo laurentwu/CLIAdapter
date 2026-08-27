@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "zhipuai",
+  "defaultModel": "glm-5.3",
+  "defaultThinkingLevel": "high"
+}

@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:codex:models:v1",
+  "$comment": "Target: Codex upstream model catalog at commit 5bcd7b0fbcefb41d0caa8db1a212ad7d47cf93ab; local Schema v1 template subset; source: https://raw.githubusercontent.com/openai/codex/5bcd7b0fbcefb41d0caa8db1a212ad7d47cf93ab/codex-rs/models-manager/models.json; checked 2026-08-27. The user-requested max reasoning level is retained.",
+  "title": "Codex models.json",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "ReasoningLevel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "effort": {
+          "type": "string",
+          "enum": [
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "effort",
+        "description"
+      ]
+    },
+    "TruncationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "bytes",
+            "tokens"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "mode",
+        "limit"
+      ]
+    },
+    "Model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "default_reasoning_level": {
+          "type": "string",
+          "enum": [
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        "supported_reasoning_levels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/ReasoningLevel"
+          }
+        },
+        "shell_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "list",
+            "hidden"
+          ]
+        },
+        "supported_in_api": {
+          "type": "boolean"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "base_instructions": {
+          "type": "string"
+        },
+        "supports_reasoning_summaries": {
+          "type": "boolean"
+        },
+        "default_reasoning_summary": {
+          "type": "string",
+          "enum": [
+            "none",
+            "concise",
+            "detailed"
+          ]
+        },
+        "support_verbosity": {
+          "type": "boolean"
+        },
+        "apply_patch_tool_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "truncation_policy": {
+          "$ref": "#/definitions/TruncationPolicy"
+        },
+        "context_window": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_context_window": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "effective_context_window_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "supports_parallel_tool_calls": {
+          "type": "boolean"
+        },
+        "experimental_supported_tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "input_modalities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "audio"
+            ]
+          }
+        }
+      },
+      "required": [
+        "slug",
+        "display_name",
+        "description",
+        "default_reasoning_level",
+        "supported_reasoning_levels",
+        "shell_type",
+        "visibility",
+        "supported_in_api",
+        "priority",
+        "base_instructions",
+        "supports_reasoning_summaries",
+        "default_reasoning_summary",
+        "support_verbosity",
+        "apply_patch_tool_type",
+        "truncation_policy",
+        "context_window",
+        "max_context_window",
+        "effective_context_window_percent",
+        "supports_parallel_tool_calls",
+        "experimental_supported_tools",
+        "input_modalities"
+      ]
+    }
+  },
+  "properties": {
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/Model"
+      }
+    }
+  },
+  "required": [
+    "models"
+  ]
+}

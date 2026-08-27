@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:codex:config:v1",
+  "$comment": "Target: Codex upstream config schema at commit a57b398351a803c9ec94e38042bc82f527bed2a4; local Schema v1 subset; source: https://developers.openai.com/codex/config-reference and https://raw.githubusercontent.com/openai/codex/a57b398351a803c9ec94e38042bc82f527bed2a4/codex-rs/core/config.schema.json; checked 2026-08-27. The local template uses the current Responses wire API only.",
+  "title": "Codex config.toml (parsed object)",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "ModelProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wire_api": {
+          "type": "string",
+          "enum": [
+            "responses"
+          ]
+        },
+        "env_key": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "experimental_bearer_token": {
+          "type": "string"
+        },
+        "http_headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "base_url",
+        "wire_api"
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "env_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "env_key"
+          ]
+        },
+        {
+          "properties": {
+            "experimental_bearer_token": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "experimental_bearer_token"
+          ]
+        }
+      ]
+    }
+  },
+  "properties": {
+    "model_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_reasoning_effort": {
+      "type": "string",
+      "enum": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "model_catalog_json": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_providers": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/ModelProvider"
+      }
+    }
+  },
+  "required": [
+    "model_provider",
+    "model",
+    "model_reasoning_effort",
+    "model_catalog_json",
+    "model_providers"
+  ]
+}

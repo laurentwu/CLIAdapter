@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "qwen3.7-plus",
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "<Your API Key>",
+    "ANTHROPIC_BASE_URL": "https://opencode.ai/zen/go",
+    "ANTHROPIC_MODEL": "qwen3.7-plus"
+  }
+}

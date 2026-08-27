@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cli-config:opencode:config:v1",
+  "$comment": "Target: OpenCode stable v1 configuration format; local Schema v1 offline subset; source: https://dev.opencode.ai/docs/config and https://opencode.ai/config.json; checked 2026-08-27. Remote models.dev references are intentionally replaced with local definitions.",
+  "$ref": "#/$defs/Config",
+  "$defs": {
+    "ModelReference": {
+      "type": "string",
+      "pattern": "^[^/]+/[^/]+$"
+    },
+    "Options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "apiKey": {
+          "type": "string"
+        }
+      }
+    },
+    "ModelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reasoning": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "context": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "output": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "ProviderConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "npm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "$ref": "#/$defs/Options"
+        },
+        "models": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelConfig"
+          }
+        }
+      },
+      "required": [
+        "npm",
+        "name",
+        "options",
+        "models"
+      ]
+    },
+    "Config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelReference"
+        },
+        "small_model": {
+          "$ref": "#/$defs/ModelReference"
+        },
+        "provider": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/ProviderConfig"
+          }
+        }
+      },
+      "required": [
+        "model",
+        "provider"
+      ]
+    }
+  }
+}
