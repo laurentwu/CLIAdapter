@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Ajv, type AnySchema, type ValidateFunction } from "ajv";
@@ -11,14 +11,22 @@ type CliId = "claude" | "codex" | "opencode" | "pi";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
-type ApiCatalog = Record<string, { models?: Record<string, unknown> }>;
+type ApiCatalog = Record<string, { api?: string; models?: Record<string, unknown> }>;
 const apiCatalog = readJson(join(rootDir, "api.json")) as ApiCatalog;
 
-const allProviders = ["zhipuai", "zhipuai-coding-plan", "deepseek", "opencode", "opencode-go"];
+const allProviders = [
+  "zhipuai",
+  "zhipuai-coding-plan",
+  "zai",
+  "zai-coding-plan",
+  "deepseek",
+  "opencode",
+  "opencode-go",
+];
 
 const coverage: Record<CliId, readonly string[]> = {
-  claude: ["zhipuai-coding-plan", "deepseek", "opencode", "opencode-go"],
-  codex: ["zhipuai-coding-plan", "opencode", "opencode-go"],
+  claude: [...allProviders],
+  codex: allProviders.filter((providerId) => providerId !== "deepseek"),
   opencode: [...allProviders],
   pi: [...allProviders],
 };
@@ -164,69 +172,68 @@ function assertNoUnexpectedSecret(value: unknown, path = "$", key?: string): voi
   }
 }
 
-function assertTemplateIdentity(
+function hostnameOf(url: string): string {
+  return new URL(url).hostname;
+}
+
+function assertBaseUrlHost(value: unknown, expectedHost: string, label: string): void {
+  expect(typeof value, `${label} must be a URL string`).toBe("string");
+  if (typeof value !== "string") return;
+  expect(
+    hostnameOf(value),
+    `${label} must stay on the ${expectedHost} host to avoid provider mix-ups`,
+  ).toBe(expectedHost);
+}
+
+function assertProviderTemplateIdentity(
   cli: CliId,
   providerId: string,
-  modelId: string,
-  parsed: Record<string, JsonObject>,
+  parsedByFile: Record<string, JsonObject>,
 ): void {
-  assertNoUnexpectedSecret(parsed);
+  const apiHost = hostnameOf(apiCatalog[providerId]?.api as string);
 
   if (cli === "claude") {
-    const settings = parsed["settings.json"];
-    expect(settings.model).toBe(modelId);
-    assertBaseUrlWithoutAppendedSuffix(
-      settings.env?.ANTHROPIC_BASE_URL,
-      clientAppendedSuffix.claude,
-      "settings.json.env.ANTHROPIC_BASE_URL",
+    assertBaseUrlHost(
+      parsedByFile["settings.json"]?.env?.ANTHROPIC_BASE_URL,
+      apiHost,
+      `${cli}/${providerId}/settings.json.env.ANTHROPIC_BASE_URL`,
     );
     return;
   }
 
   if (cli === "codex") {
-    const config = parsed["config.toml"];
-    const catalog = parsed["models.json"];
-    expect(config.model).toBe(modelId);
-    expect(config.model_catalog_json).toBe("~/.codex/models.json");
-    expect(config.model_providers).toBeTruthy();
-    expect(Object.keys(config.model_providers)).toContain(config.model_provider);
+    const config = parsedByFile["config.toml"];
+    expect(
+      Object.keys(config.model_providers as JsonObject),
+      `${cli}/${providerId}/config.toml.model_provider must be a declared model_providers key`,
+    ).toContain(config.model_provider);
     for (const [providerKey, provider] of Object.entries(config.model_providers as JsonObject)) {
-      assertBaseUrlWithoutAppendedSuffix(
+      assertBaseUrlHost(
         (provider as JsonObject).base_url,
-        clientAppendedSuffix.codex,
-        `config.toml.model_providers.${providerKey}.base_url`,
+        apiHost,
+        `${cli}/${providerId}/config.toml.model_providers.${providerKey}.base_url`,
       );
     }
-    expect(
-      (catalog.models as JsonObject[]).some((model) => model.slug === modelId),
-    ).toBe(true);
     return;
   }
 
   if (cli === "opencode") {
-    const config = parsed["opencode.json"];
-    expect(config.model).toBe(`${providerId}/${modelId}`);
-    const provider = config.provider[providerId];
-    assertBaseUrlWithoutAppendedSuffix(
-      provider.options?.baseURL,
-      clientAppendedSuffix.opencode,
-      `opencode.json.provider.${providerId}.options.baseURL`,
+    const config = parsedByFile["opencode.json"];
+    expect(config.model).toBe(`${providerId}/<model-id>`);
+    assertBaseUrlHost(
+      config.provider?.[providerId]?.options?.baseURL,
+      apiHost,
+      `${cli}/${providerId}/opencode.json.provider.${providerId}.options.baseURL`,
     );
-    expect(provider.models[modelId]).toBeTruthy();
     return;
   }
 
-  const settings = parsed["settings.json"];
-  const models = parsed["models.json"];
-  expect(settings.defaultProvider).toBe(providerId);
-  expect(settings.defaultModel).toBe(modelId);
-  const provider = models.providers[providerId];
-  assertBaseUrlWithoutAppendedSuffix(
-    provider.baseUrl,
-    clientAppendedSuffix.pi,
-    `models.json.providers.${providerId}.baseUrl`,
+  expect(parsedByFile["settings.json"]?.defaultProvider).toBe(providerId);
+  assertBaseUrlHost(
+    parsedByFile["models.json"]?.providers?.[providerId]?.baseUrl,
+    apiHost,
+    `${cli}/${providerId}/models.json.providers.${providerId}.baseUrl`,
   );
-  expect(provider.models.some((model: JsonObject) => model.id === modelId)).toBe(true);
 }
 
 describe("repository schemas", () => {
@@ -252,49 +259,34 @@ describe("repository schemas", () => {
           apiEntry,
           `${cliId}/${providerId} must be a provider id in api.json`,
         ).toBeTruthy();
-        const apiModelIds = Object.keys(apiEntry?.models ?? {});
 
         const providerRoot = join(cliRoot, providerId);
-        expect(statSync(join(providerRoot, "provider.json")).isFile()).toBe(true);
+        expect(
+          listDirectories(providerRoot),
+          `${cliId}/${providerId} must not contain model directories; only provider-level templates exist`,
+        ).toEqual([]);
+        expect(listFiles(providerRoot)).toEqual(
+          [...requiredFiles[cliId], "provider.json"].sort(),
+        );
+
         const providerInfo = readJson(join(providerRoot, "provider.json"));
+        expect(providerInfo.id).toBe(providerId);
         assertBaseUrlWithoutAppendedSuffix(
           providerInfo.base_url,
           clientAppendedSuffix[cliId],
           `${cliId}/${providerId}/provider.json.base_url`,
         );
-
-        const models = listDirectories(providerRoot);
-        expect(models.length, `${cliId}/${providerId} must contain a model`).toBeGreaterThan(0);
-        for (const modelId of models) {
-          expect(modelId).not.toMatch(/[\\/]/);
-          expect(
-            apiModelIds,
-            `${cliId}/${providerId}/${modelId} must be a model id of ${providerId} in api.json`,
-          ).toContain(modelId);
-        }
+        expect(
+          apiEntry?.api,
+          `${cliId}/${providerId} must define a valid api url in api.json`,
+        ).toBeTruthy();
+        expect(
+          hostnameOf(providerInfo.base_url),
+          `${cliId}/${providerId}/provider.json.base_url must stay on the api.json host to avoid provider mix-ups`,
+        ).toBe(hostnameOf(apiEntry?.api as string));
       }
     }
   });
-});
-
-describe("configuration templates", () => {
-  for (const cliId of Object.keys(fileSchemas) as CliId[]) {
-    it(`validates every ${cliId} template`, () => {
-      for (const providerId of coverage[cliId]) {
-        const providerRoot = join(rootDir, cliId, providerId);
-        for (const modelId of listDirectories(providerRoot)) {
-          const modelRoot = join(providerRoot, modelId);
-          expect(listFiles(modelRoot)).toEqual([...requiredFiles[cliId]].sort());
-
-          const parsed: Record<string, JsonObject> = {};
-          for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId])) {
-            parsed[fileName] = validateTemplate(join(modelRoot, fileName), schemaPath);
-          }
-          assertTemplateIdentity(cliId, providerId, modelId, parsed);
-        }
-      }
-    });
-  }
 });
 
 describe("fallback configuration templates", () => {
@@ -317,19 +309,30 @@ describe("fallback configuration templates", () => {
     return result;
   }
 
-  function validateLevelTemplate(filePath: string, schemaPath: string, values: string[]): void {
+  function validateLevelTemplate(
+    filePath: string,
+    schemaPath: string,
+    values: string[],
+  ): JsonObject {
     const parsed = validateTemplate(filePath, schemaPath);
     assertNoUnexpectedSecret(parsed);
     collectStringValues(parsed, values);
+    return parsed;
   }
 
   for (const cliId of Object.keys(fileSchemas) as CliId[]) {
     it(`validates every ${cliId} provider-level and cli-level template`, () => {
       for (const providerId of coverage[cliId]) {
         const values: string[] = [];
+        const parsedByFile: Record<string, JsonObject> = {};
         for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId])) {
-          validateLevelTemplate(join(rootDir, cliId, providerId, fileName), schemaPath, values);
+          parsedByFile[fileName] = validateLevelTemplate(
+            join(rootDir, cliId, providerId, fileName),
+            schemaPath,
+            values,
+          );
         }
+        assertProviderTemplateIdentity(cliId, providerId, parsedByFile);
         expect(
           values.some((value) => value.includes("<model-id>") || value.includes("<model-name>")),
           `${cliId}/${providerId} templates must use model placeholders`,

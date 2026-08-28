@@ -1,6 +1,6 @@
 {
-  "id": "zhipuai-coding-plan",
-  "name": "Zhipu AI Coding Plan",
+  "id": "zhipuai",
+  "name": "Zhipu AI",
   "env": ["ZHIPU_API_KEY"],
   "protocol": "anthropic-messages",
   "base_url": "https://open.bigmodel.cn/api/anthropic",
