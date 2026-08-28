@@ -1,0 +1,50 @@
+name: Update api.json
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-api-json
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download api.json
+        run: |
+          curl --fail --location --silent --show-error \
+            --retry 3 --retry-delay 5 --retry-all-errors \
+            -o api.json https://models.dev/api.json
+
+      - name: Validate JSON
+        run: |
+          python3 -m json.tool api.json > /dev/null
+          test "$(stat -c %s api.json)" -gt 100000
+          python3 -c "import json; d = json.load(open('api.json')); assert isinstance(d, dict) and len(d) > 0"
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet -- api.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api.json
+          git commit -m "chore: update api.json from models.dev"
+          git push
