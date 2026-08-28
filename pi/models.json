@@ -1,0 +1,25 @@
+{
+  "providers": {
+    "<provider-id>": {
+      "baseUrl": "<base-url>",
+      "api": "openai-completions",
+      "apiKey": "<Your API Key>",
+      "models": [
+        {
+          "id": "<model-id>",
+          "name": "<model-name>",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 1000000,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  }
+}

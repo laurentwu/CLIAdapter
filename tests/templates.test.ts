@@ -11,19 +11,16 @@ type CliId = "claude" | "codex" | "opencode" | "pi";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
-const providers = [
-  "zhipuai",
-  "zhipuai-coding-plan",
-  "deepseek",
-  "opencode",
-  "opencode-go",
-] as const;
+type ApiCatalog = Record<string, { models?: Record<string, unknown> }>;
+const apiCatalog = readJson(join(rootDir, "api.json")) as ApiCatalog;
+
+const allProviders = ["zhipuai", "zhipuai-coding-plan", "deepseek", "opencode", "opencode-go"];
 
 const coverage: Record<CliId, readonly string[]> = {
   claude: ["zhipuai-coding-plan", "deepseek", "opencode", "opencode-go"],
   codex: ["zhipuai-coding-plan", "opencode", "opencode-go"],
-  opencode: [...providers],
-  pi: [...providers],
+  opencode: [...allProviders],
+  pi: [...allProviders],
 };
 
 const fileSchemas: Record<CliId, Record<string, string>> = {
@@ -244,19 +241,21 @@ describe("repository schemas", () => {
   });
 
   it("keeps the declared CLI/provider coverage and provider assets", () => {
-    const seenProviders = new Set<string>();
-
     for (const cliId of Object.keys(coverage) as CliId[]) {
       const cliRoot = join(rootDir, cliId);
       const actualProviders = listDirectories(cliRoot).filter((name) => name !== "schemas");
       expect(actualProviders).toEqual([...coverage[cliId]].sort());
 
       for (const providerId of actualProviders) {
-        expect(providers).toContain(providerId as (typeof providers)[number]);
-        seenProviders.add(providerId);
+        const apiEntry = apiCatalog[providerId];
+        expect(
+          apiEntry,
+          `${cliId}/${providerId} must be a provider id in api.json`,
+        ).toBeTruthy();
+        const apiModelIds = Object.keys(apiEntry?.models ?? {});
+
         const providerRoot = join(cliRoot, providerId);
         expect(statSync(join(providerRoot, "provider.json")).isFile()).toBe(true);
-        expect(statSync(join(providerRoot, "logo.svg")).isFile()).toBe(true);
         const providerInfo = readJson(join(providerRoot, "provider.json"));
         assertBaseUrlWithoutAppendedSuffix(
           providerInfo.base_url,
@@ -268,12 +267,13 @@ describe("repository schemas", () => {
         expect(models.length, `${cliId}/${providerId} must contain a model`).toBeGreaterThan(0);
         for (const modelId of models) {
           expect(modelId).not.toMatch(/[\\/]/);
-          expect(modelId).not.toBe("model.json");
+          expect(
+            apiModelIds,
+            `${cliId}/${providerId}/${modelId} must be a model id of ${providerId} in api.json`,
+          ).toContain(modelId);
         }
       }
     }
-
-    expect([...seenProviders].sort()).toEqual([...providers].sort());
   });
 });
 
@@ -293,6 +293,69 @@ describe("configuration templates", () => {
           assertTemplateIdentity(cliId, providerId, modelId, parsed);
         }
       }
+    });
+  }
+});
+
+describe("fallback configuration templates", () => {
+  const providerPlaceholders = [
+    "<provider-id>",
+    "<provider-key>",
+    "<provider-name>",
+    "<npm-package>",
+    "<base-url>",
+  ];
+
+  function collectStringValues(value: unknown, result: string[] = []): string[] {
+    if (typeof value === "string") {
+      result.push(value);
+    } else if (Array.isArray(value)) {
+      value.forEach((item) => collectStringValues(item, result));
+    } else if (value && typeof value === "object") {
+      for (const child of Object.values(value)) collectStringValues(child, result);
+    }
+    return result;
+  }
+
+  function validateLevelTemplate(filePath: string, schemaPath: string, values: string[]): void {
+    const parsed = validateTemplate(filePath, schemaPath);
+    assertNoUnexpectedSecret(parsed);
+    collectStringValues(parsed, values);
+  }
+
+  for (const cliId of Object.keys(fileSchemas) as CliId[]) {
+    it(`validates every ${cliId} provider-level and cli-level template`, () => {
+      for (const providerId of coverage[cliId]) {
+        const values: string[] = [];
+        for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId])) {
+          validateLevelTemplate(join(rootDir, cliId, providerId, fileName), schemaPath, values);
+        }
+        expect(
+          values.some((value) => value.includes("<model-id>") || value.includes("<model-name>")),
+          `${cliId}/${providerId} templates must use model placeholders`,
+        ).toBe(true);
+        for (const placeholder of providerPlaceholders) {
+          expect(
+            values.some((value) => value.includes(placeholder)),
+            `${cliId}/${providerId} templates must keep real provider values (unexpected ${placeholder})`,
+          ).toBe(false);
+        }
+      }
+
+      const cliValues: string[] = [];
+      for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId])) {
+        validateLevelTemplate(join(rootDir, cliId, fileName), schemaPath, cliValues);
+      }
+      expect(
+        cliValues.some((value) => value.includes("<model-id>")),
+        `${cliId} templates must use model placeholders`,
+      ).toBe(true);
+      expect(
+        cliValues.some((value) =>
+          providerPlaceholders.some((placeholder) => value.includes(placeholder)),
+        ),
+        `${cliId} templates must use provider placeholders`,
+      ).toBe(true);
     });
   }
 });

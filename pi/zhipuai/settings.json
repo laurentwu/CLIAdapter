@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "zhipuai",
+  "defaultModel": "<model-id>",
+  "defaultThinkingLevel": "high"
+}
