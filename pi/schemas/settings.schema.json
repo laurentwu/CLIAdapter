@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:pi:settings:v1",
+  "$comment": "Target: Pi latest documented settings format; local Schema v1; source: https://pi.dev/docs/latest/settings; checked 2026-08-27.",
+  "title": "Pi settings.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "defaultProvider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaultModel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaultThinkingLevel": {
+      "type": "string",
+      "enum": [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    }
+  },
+  "required": [
+    "defaultProvider",
+    "defaultModel",
+    "defaultThinkingLevel"
+  ]
+}

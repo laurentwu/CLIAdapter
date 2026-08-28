@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:pi:models:v1",
+  "$comment": "Target: Pi latest documented custom-model format; local Schema v1; source: https://pi.dev/docs/latest/models; checked 2026-08-27.",
+  "title": "Pi models.json",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "Cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input": {
+          "type": "number",
+          "minimum": 0
+        },
+        "output": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cacheRead": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cacheWrite": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "input",
+        "output",
+        "cacheRead",
+        "cacheWrite"
+      ]
+    },
+    "Model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api": {
+          "type": "string",
+          "enum": [
+            "openai-completions",
+            "openai-responses",
+            "anthropic-messages",
+            "google-generative-ai"
+          ]
+        },
+        "reasoning": {
+          "type": "boolean"
+        },
+        "thinkingLevelMap": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "input": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "audio"
+            ]
+          }
+        },
+        "contextWindow": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cost": {
+          "$ref": "#/definitions/Cost"
+        },
+        "compat": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "reasoning",
+        "input",
+        "contextWindow",
+        "maxTokens",
+        "cost"
+      ]
+    },
+    "Provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api": {
+          "type": "string",
+          "enum": [
+            "openai-completions",
+            "openai-responses",
+            "anthropic-messages",
+            "google-generative-ai"
+          ]
+        },
+        "apiKey": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "authHeader": {
+          "type": "boolean"
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/Model"
+          }
+        }
+      },
+      "required": [
+        "baseUrl",
+        "api",
+        "apiKey",
+        "models"
+      ]
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "providers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/definitions/Provider"
+      }
+    }
+  },
+  "required": [
+    "providers"
+  ]
+}
