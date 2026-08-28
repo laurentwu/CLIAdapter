@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "opencode-go",
+  "defaultModel": "<model-id>",
+  "defaultThinkingLevel": "high"
+}

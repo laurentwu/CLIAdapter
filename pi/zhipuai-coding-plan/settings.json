@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "zhipuai-coding-plan",
+  "defaultModel": "<model-id>",
+  "defaultThinkingLevel": "high"
+}
