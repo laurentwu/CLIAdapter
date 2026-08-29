@@ -1,0 +1,16 @@
+{
+  "name": "<provider-id>",
+  "engine": "openai",
+  "display_name": "<provider-name>",
+  "description": "<provider-name> (OpenAI-compatible endpoint)",
+  "api_key_env": "<provider-key>",
+  "base_url": "<base-url>",
+  "models": [
+    {
+      "name": "<model-id>",
+      "context_limit": 1000000
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": true
+}

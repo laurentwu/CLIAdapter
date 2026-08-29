@@ -17,9 +17,9 @@ Static CLI configuration templates with offline JSON Schema validation tests. No
 
 ## Layout
 
-- `${cli}/schemas/` — local JSON Schemas per config file.
-- `${cli}/${provider}/provider.json` — provider metadata (base URL must exclude the client-appended path).
-- Per-CLI template files: claude `settings.json`; codex `config.toml` + `models.json`; opencode `opencode.json`; pi `settings.json` + `models.json`.
+- `${cli}/schemas/` — local JSON Schemas per config file (crush has none: its `crushrc` is a Bash script validated by text assertions).
+- `${cli}/${provider}/provider.json` — provider metadata (base URL must exclude the client-appended path; codebuddy and goose are exceptions: their configs take the full endpoint URL, so `base_url` includes `/chat/completions`).
+- Per-CLI template files: claude `settings.json`; codex `config.toml` + `models.json`; opencode `opencode.json`; pi `settings.json` + `models.json`; qwen `settings.json`; kimi `config.toml`; codebuddy `models.json`; crush `crushrc`; goose `config.yaml` + `custom-provider.json`.
 
 ## Testing
 

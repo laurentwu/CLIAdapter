@@ -1,0 +1,6 @@
+active_provider: opencode-go
+providers:
+  opencode-go:
+    enabled: true
+    model: <model-id>
+    configured: true

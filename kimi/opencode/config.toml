@@ -1,0 +1,9 @@
+[providers.opencode]
+type = "openai"
+base_url = "https://opencode.ai/zen/v1"
+api_key = "<Your API Key>"
+
+[models."<model-id>"]
+provider = "opencode"
+model = "<model-id>"
+max_context_size = 1000000

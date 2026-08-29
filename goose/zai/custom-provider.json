@@ -1,0 +1,16 @@
+{
+  "name": "zai",
+  "engine": "openai",
+  "display_name": "Z.AI",
+  "description": "Z.AI (OpenAI-compatible endpoint)",
+  "api_key_env": "ZHIPU_API_KEY",
+  "base_url": "https://api.z.ai/api/paas/v4/chat/completions",
+  "models": [
+    {
+      "name": "<model-id>",
+      "context_limit": 1000000
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": true
+}

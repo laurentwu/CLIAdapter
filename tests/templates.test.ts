@@ -1,13 +1,23 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Ajv, type AnySchema, type ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { parse as parseToml } from "smol-toml";
+import { parse as parseYaml } from "yaml";
 import { describe, expect, it } from "vitest";
 
 type JsonObject = Record<string, any>;
-type CliId = "claude" | "codex" | "opencode" | "pi";
+type CliId =
+  | "claude"
+  | "codex"
+  | "opencode"
+  | "pi"
+  | "qwen"
+  | "kimi"
+  | "codebuddy"
+  | "crush"
+  | "goose";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -29,9 +39,14 @@ const coverage: Record<CliId, readonly string[]> = {
   codex: allProviders.filter((providerId) => providerId !== "deepseek"),
   opencode: [...allProviders],
   pi: [...allProviders],
+  qwen: [...allProviders],
+  kimi: [...allProviders],
+  codebuddy: [...allProviders],
+  crush: [...allProviders],
+  goose: [...allProviders],
 };
 
-const fileSchemas: Record<CliId, Record<string, string>> = {
+const fileSchemas: Partial<Record<CliId, Record<string, string>>> = {
   claude: {
     "settings.json": "claude/schemas/settings.schema.json",
   },
@@ -46,6 +61,19 @@ const fileSchemas: Record<CliId, Record<string, string>> = {
     "models.json": "pi/schemas/models.schema.json",
     "settings.json": "pi/schemas/settings.schema.json",
   },
+  qwen: {
+    "settings.json": "qwen/schemas/settings.schema.json",
+  },
+  kimi: {
+    "config.toml": "kimi/schemas/config.schema.json",
+  },
+  codebuddy: {
+    "models.json": "codebuddy/schemas/models.schema.json",
+  },
+  goose: {
+    "config.yaml": "goose/schemas/config.schema.json",
+    "custom-provider.json": "goose/schemas/custom-provider.schema.json",
+  },
 };
 
 const requiredFiles: Record<CliId, readonly string[]> = {
@@ -53,6 +81,11 @@ const requiredFiles: Record<CliId, readonly string[]> = {
   codex: ["config.toml", "models.json"],
   opencode: ["opencode.json"],
   pi: ["models.json", "settings.json"],
+  qwen: ["settings.json"],
+  kimi: ["config.toml"],
+  codebuddy: ["models.json"],
+  crush: ["crushrc"],
+  goose: ["config.yaml", "custom-provider.json"],
 };
 
 const clientAppendedSuffix: Record<CliId, string> = {
@@ -60,6 +93,11 @@ const clientAppendedSuffix: Record<CliId, string> = {
   codex: "/responses",
   opencode: "/chat/completions",
   pi: "/chat/completions",
+  qwen: "/chat/completions",
+  kimi: "/chat/completions",
+  codebuddy: "",
+  crush: "/chat/completions",
+  goose: "",
 };
 
 const ajvDraft7 = new Ajv({ allErrors: true, strict: true });
@@ -121,6 +159,9 @@ function parseTemplate(filePath: string): JsonObject {
   if (filePath.endsWith(".toml")) {
     return parseToml(readFileSync(filePath, "utf8")) as JsonObject;
   }
+  if (filePath.endsWith(".yaml")) {
+    return parseYaml(readFileSync(filePath, "utf8")) as JsonObject;
+  }
   return readJson(filePath);
 }
 
@@ -140,6 +181,7 @@ function assertBaseUrlWithoutAppendedSuffix(
   suffix: string,
   label: string,
 ): void {
+  if (!suffix) return;
   expect(typeof value, `${label} must be a URL string`).toBe("string");
   if (typeof value !== "string") return;
 
@@ -153,6 +195,7 @@ function assertBaseUrlWithoutAppendedSuffix(
 function assertNoUnexpectedSecret(value: unknown, path = "$", key?: string): void {
   const secretKeys = new Set([
     "apiKey",
+    "api_key",
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
     "experimental_bearer_token",
@@ -228,6 +271,124 @@ function assertProviderTemplateIdentity(
     return;
   }
 
+  if (cli === "qwen") {
+    const settings = parsedByFile["settings.json"];
+    expect(
+      settings.providerProtocol?.[providerId],
+      `${cli}/${providerId}/settings.json.providerProtocol.${providerId} must map to the openai protocol`,
+    ).toBe("openai");
+    const models = settings.modelProviders?.[providerId];
+    expect(
+      Array.isArray(models),
+      `${cli}/${providerId}/settings.json.modelProviders.${providerId} must be a model array`,
+    ).toBe(true);
+    for (const [index, model] of (models ?? []).entries()) {
+      assertBaseUrlHost(
+        model.baseUrl,
+        apiHost,
+        `${cli}/${providerId}/settings.json.modelProviders.${providerId}[${index}].baseUrl`,
+      );
+      expect(
+        Object.keys(settings.env ?? {}),
+        `${cli}/${providerId}/settings.json.modelProviders.${providerId}[${index}].envKey must have a matching settings.json.env entry`,
+      ).toContain(model.envKey);
+    }
+    for (const [envKey, envValue] of Object.entries(settings.env ?? {})) {
+      expect(
+        envValue,
+        `${cli}/${providerId}/settings.json.env.${envKey} must keep the manual placeholder`,
+      ).toBe("<Your API Key>");
+    }
+    return;
+  }
+
+  if (cli === "kimi") {
+    const config = parsedByFile["config.toml"];
+    const provider = config.providers?.[providerId];
+    expect(
+      provider?.type,
+      `${cli}/${providerId}/config.toml.providers.${providerId}.type must use the OpenAI-compatible protocol`,
+    ).toBe("openai");
+    assertBaseUrlHost(
+      provider?.base_url,
+      apiHost,
+      `${cli}/${providerId}/config.toml.providers.${providerId}.base_url`,
+    );
+    const modelEntries = Object.entries<JsonObject>(config.models ?? {});
+    expect(
+      modelEntries.length,
+      `${cli}/${providerId}/config.toml.models must declare at least one model alias`,
+    ).toBeGreaterThan(0);
+    for (const [alias, model] of modelEntries) {
+      expect(
+        model.provider,
+        `${cli}/${providerId}/config.toml.models.${alias}.provider must reference the provider`,
+      ).toBe(providerId);
+    }
+    return;
+  }
+
+  if (cli === "codebuddy") {
+    const config = parsedByFile["models.json"];
+    const providerInfo = readJson(join(rootDir, cli, providerId, "provider.json"));
+    expect(
+      Array.isArray(config.models),
+      `${cli}/${providerId}/models.json.models must be an array`,
+    ).toBe(true);
+    for (const [index, model] of (config.models ?? []).entries()) {
+      assertBaseUrlHost(
+        model.url,
+        apiHost,
+        `${cli}/${providerId}/models.json.models[${index}].url`,
+      );
+      expect(
+        model.url.replace(/\/+$/, "").endsWith("/chat/completions"),
+        `${cli}/${providerId}/models.json.models[${index}].url must be the full chat completions endpoint`,
+      ).toBe(true);
+      expect(
+        model.url,
+        `${cli}/${providerId}/models.json.models[${index}].url must match provider.json base_url`,
+      ).toBe(providerInfo.base_url);
+    }
+    return;
+  }
+
+  if (cli === "goose") {
+    const config = parsedByFile["config.yaml"];
+    const provider = parsedByFile["custom-provider.json"];
+    const providerInfo = readJson(join(rootDir, cli, providerId, "provider.json"));
+    expect(
+      config.active_provider,
+      `${cli}/${providerId}/config.yaml.active_provider must select the provider`,
+    ).toBe(providerId);
+    expect(
+      config.providers?.[providerId]?.model,
+      `${cli}/${providerId}/config.yaml.providers.${providerId}.model must use a model placeholder`,
+    ).toBe("<model-id>");
+    expect(
+      provider.name,
+      `${cli}/${providerId}/custom-provider.json.name must be the provider id`,
+    ).toBe(providerId);
+    expect(
+      provider.engine,
+      `${cli}/${providerId}/custom-provider.json.engine must use the OpenAI-compatible engine`,
+    ).toBe("openai");
+    assertBaseUrlHost(
+      provider.base_url,
+      apiHost,
+      `${cli}/${providerId}/custom-provider.json.base_url`,
+    );
+    expect(
+      provider.base_url.replace(/\/+$/, "").endsWith("/chat/completions"),
+      `${cli}/${providerId}/custom-provider.json.base_url must be the full chat completions endpoint`,
+    ).toBe(true);
+    expect(
+      provider.base_url,
+      `${cli}/${providerId}/custom-provider.json.base_url must match provider.json base_url`,
+    ).toBe(providerInfo.base_url);
+    return;
+  }
+
   expect(parsedByFile["settings.json"]?.defaultProvider).toBe(providerId);
   assertBaseUrlHost(
     parsedByFile["models.json"]?.providers?.[providerId]?.baseUrl,
@@ -237,11 +398,24 @@ function assertProviderTemplateIdentity(
 }
 
 describe("repository schemas", () => {
-  it("contains the four planned CLI roots and all local schemas compile offline", () => {
-    const cliIds: CliId[] = ["claude", "codex", "opencode", "pi"];
+  it("contains the nine planned CLI roots and all local schemas compile offline", () => {
+    const cliIds: CliId[] = [
+      "claude",
+      "codex",
+      "opencode",
+      "pi",
+      "qwen",
+      "kimi",
+      "codebuddy",
+      "crush",
+      "goose",
+    ];
     for (const cliId of cliIds) {
+      expect(existsSync(join(rootDir, cliId)), `${cliId} CLI root must exist`).toBe(true);
+    }
+    for (const cliId of Object.keys(fileSchemas) as CliId[]) {
       expect(listDirectories(join(rootDir, cliId))).toContain("schemas");
-      for (const schemaPath of Object.values(fileSchemas[cliId])) {
+      for (const schemaPath of Object.values(fileSchemas[cliId] ?? {})) {
         getValidator(schemaPath);
       }
     }
@@ -325,7 +499,7 @@ describe("fallback configuration templates", () => {
       for (const providerId of coverage[cliId]) {
         const values: string[] = [];
         const parsedByFile: Record<string, JsonObject> = {};
-        for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId])) {
+        for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId] ?? {})) {
           parsedByFile[fileName] = validateLevelTemplate(
             join(rootDir, cliId, providerId, fileName),
             schemaPath,
@@ -346,7 +520,7 @@ describe("fallback configuration templates", () => {
       }
 
       const cliValues: string[] = [];
-      for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId])) {
+      for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId] ?? {})) {
         validateLevelTemplate(join(rootDir, cliId, fileName), schemaPath, cliValues);
       }
       expect(
@@ -361,6 +535,101 @@ describe("fallback configuration templates", () => {
       ).toBe(true);
     });
   }
+});
+
+describe("crush text templates", () => {
+  const providerPlaceholders = [
+    "<provider-id>",
+    "<provider-key>",
+    "<provider-name>",
+    "<npm-package>",
+    "<base-url>",
+  ];
+
+  function readCrushrc(relativePath: string): string {
+    return readFileSync(join(rootDir, relativePath), "utf8");
+  }
+
+  function extractFlagValue(text: string, flag: string): string | undefined {
+    return text.match(new RegExp(`${flag} "([^"]+)"`))?.[1];
+  }
+
+  it("validates every crush provider-level crushrc", () => {
+    for (const providerId of coverage.crush) {
+      const text = readCrushrc(`crush/${providerId}/crushrc`);
+      const apiHost = hostnameOf(apiCatalog[providerId]?.api as string);
+      const providerInfo = readJson(join(rootDir, "crush", providerId, "provider.json"));
+
+      expect(
+        text.includes(`provider add ${providerId} --name "${providerInfo.name}" --type openai-compat`),
+        `crush/${providerId}/crushrc must register the provider with its display name`,
+      ).toBe(true);
+      expect(
+        text.includes(`model add ${providerId}/<model-id>`),
+        `crush/${providerId}/crushrc must register a model placeholder`,
+      ).toBe(true);
+      expect(
+        text.includes("<model-name>"),
+        `crush/${providerId}/crushrc must use a model name placeholder`,
+      ).toBe(true);
+      expect(
+        text.includes("<Your API Key>"),
+        `crush/${providerId}/crushrc must keep the manual API key placeholder`,
+      ).toBe(true);
+
+      const baseUrl = extractFlagValue(text, "--base-url");
+      expect(
+        baseUrl,
+        `crush/${providerId}/crushrc must declare a --base-url value`,
+      ).toBeTruthy();
+      if (baseUrl) {
+        assertBaseUrlHost(baseUrl, apiHost, `crush/${providerId}/crushrc --base-url`);
+        expect(
+          baseUrl.replace(/\/+$/, "").endsWith("/chat/completions"),
+          `crush/${providerId}/crushrc --base-url must stop before the client-appended path`,
+        ).toBe(false);
+        expect(
+          baseUrl,
+          `crush/${providerId}/crushrc --base-url must match provider.json base_url`,
+        ).toBe(providerInfo.base_url);
+      }
+
+      for (const placeholder of providerPlaceholders) {
+        expect(
+          text.includes(placeholder),
+          `crush/${providerId}/crushrc keeps real provider values (unexpected ${placeholder})`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("validates the crush cli-level crushrc", () => {
+    const text = readCrushrc("crush/crushrc");
+    expect(
+      text.includes('provider add <provider-id> --name "<provider-name>" --type openai-compat'),
+      "crush/crushrc must register a provider placeholder",
+    ).toBe(true);
+    expect(
+      text.includes("--base-url \"<base-url>\""),
+      "crush/crushrc must use a base-url placeholder",
+    ).toBe(true);
+    expect(
+      text.includes("<provider-name>"),
+      "crush/crushrc must use a provider name placeholder",
+    ).toBe(true);
+    expect(
+      text.includes("<Your API Key>"),
+      "crush/crushrc must keep the manual API key placeholder",
+    ).toBe(true);
+    expect(
+      text.includes("model add <provider-id>/<model-id>"),
+      "crush/crushrc must register a model placeholder",
+    ).toBe(true);
+    expect(
+      text.includes("<model-name>"),
+      "crush/crushrc must use a model name placeholder",
+    ).toBe(true);
+  });
 });
 
 describe("negative validation fixture", () => {

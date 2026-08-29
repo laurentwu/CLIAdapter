@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:goose:config:v1",
+  "$comment": "Target: goose config.yaml provider selection subset; local Schema v1; source: https://goose-docs.ai/docs/guides/config-files; checked 2026-08-29.",
+  "title": "goose config.yaml (parsed object)",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "ProviderSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configured": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "model",
+        "configured"
+      ]
+    }
+  },
+  "properties": {
+    "active_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "providers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/definitions/ProviderSettings"
+      }
+    }
+  },
+  "required": [
+    "active_provider",
+    "providers"
+  ]
+}

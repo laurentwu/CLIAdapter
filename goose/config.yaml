@@ -1,0 +1,6 @@
+active_provider: <provider-id>
+providers:
+  <provider-id>:
+    enabled: true
+    model: <model-id>
+    configured: true

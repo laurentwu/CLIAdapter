@@ -1,0 +1,6 @@
+active_provider: zhipuai
+providers:
+  zhipuai:
+    enabled: true
+    model: <model-id>
+    configured: true

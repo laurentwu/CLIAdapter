@@ -1,0 +1,16 @@
+{
+  "name": "opencode-go",
+  "engine": "openai",
+  "display_name": "OpenCode Go",
+  "description": "OpenCode Go (OpenAI-compatible endpoint)",
+  "api_key_env": "OPENCODE_API_KEY",
+  "base_url": "https://opencode.ai/zen/go/v1/chat/completions",
+  "models": [
+    {
+      "name": "<model-id>",
+      "context_limit": 1000000
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": true
+}

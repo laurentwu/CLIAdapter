@@ -1,0 +1,9 @@
+[providers.zai-coding-plan]
+type = "openai"
+base_url = "https://api.z.ai/api/coding/paas/v4"
+api_key = "<Your API Key>"
+
+[models."<model-id>"]
+provider = "zai-coding-plan"
+model = "<model-id>"
+max_context_size = 1000000

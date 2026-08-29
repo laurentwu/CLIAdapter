@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:kimi:config:v1",
+  "$comment": "Target: Kimi Code CLI config.toml providers and models tables; local Schema v1 subset; source: https://www.kimi.com/code/docs/en/kimi-code-cli/configuration/providers.html; checked 2026-08-29.",
+  "title": "Kimi Code config.toml (parsed object)",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "Provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "kimi",
+            "anthropic",
+            "openai",
+            "openai_responses",
+            "google-genai",
+            "vertexai"
+          ]
+        },
+        "base_url": {
+          "type": "string",
+          "pattern": "^(https?://.+|<base-url>)$"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "env": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "type",
+        "base_url",
+        "api_key"
+      ]
+    },
+    "ModelAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_context_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_size": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "max_context_size"
+      ]
+    }
+  },
+  "properties": {
+    "providers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/definitions/Provider"
+      }
+    },
+    "models": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/definitions/ModelAlias"
+      }
+    }
+  },
+  "required": [
+    "providers",
+    "models"
+  ]
+}
