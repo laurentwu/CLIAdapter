@@ -1,0 +1,16 @@
+{
+  "name": "deepseek",
+  "engine": "openai",
+  "display_name": "DeepSeek",
+  "description": "DeepSeek (OpenAI-compatible endpoint)",
+  "api_key_env": "DEEPSEEK_API_KEY",
+  "base_url": "https://api.deepseek.com/chat/completions",
+  "models": [
+    {
+      "name": "<model-id>",
+      "context_limit": 1000000
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": true
+}

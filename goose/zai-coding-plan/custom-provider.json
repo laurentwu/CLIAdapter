@@ -1,0 +1,16 @@
+{
+  "name": "zai-coding-plan",
+  "engine": "openai",
+  "display_name": "Z.AI Coding Plan",
+  "description": "Z.AI Coding Plan (OpenAI-compatible endpoint)",
+  "api_key_env": "ZHIPU_API_KEY",
+  "base_url": "https://api.z.ai/api/coding/paas/v4/chat/completions",
+  "models": [
+    {
+      "name": "<model-id>",
+      "context_limit": 1000000
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": true
+}

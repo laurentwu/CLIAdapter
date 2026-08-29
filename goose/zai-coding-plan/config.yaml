@@ -1,0 +1,6 @@
+active_provider: zai-coding-plan
+providers:
+  zai-coding-plan:
+    enabled: true
+    model: <model-id>
+    configured: true

@@ -1,0 +1,3 @@
+provider add zai --name "Z.AI" --type openai-compat --base-url "https://api.z.ai/api/paas/v4" --api-key "<Your API Key>"
+
+model add zai/<model-id> --name "<model-name>" --context-window 1000000 --default-max-tokens 131072

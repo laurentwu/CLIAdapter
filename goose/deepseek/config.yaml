@@ -1,0 +1,6 @@
+active_provider: deepseek
+providers:
+  deepseek:
+    enabled: true
+    model: <model-id>
+    configured: true

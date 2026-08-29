@@ -1,0 +1,16 @@
+{
+  "models": [
+    {
+      "id": "<model-id>",
+      "name": "<model-name>",
+      "vendor": "OpenCode Zen",
+      "apiKey": "<Your API Key>",
+      "maxInputTokens": 1000000,
+      "maxOutputTokens": 131072,
+      "url": "https://opencode.ai/zen/v1/chat/completions",
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "supportsReasoning": true
+    }
+  ]
+}

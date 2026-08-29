@@ -1,0 +1,6 @@
+active_provider: opencode
+providers:
+  opencode:
+    enabled: true
+    model: <model-id>
+    configured: true

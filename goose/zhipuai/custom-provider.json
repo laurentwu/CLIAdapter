@@ -1,0 +1,16 @@
+{
+  "name": "zhipuai",
+  "engine": "openai",
+  "display_name": "Zhipu AI",
+  "description": "Zhipu AI (OpenAI-compatible endpoint)",
+  "api_key_env": "ZHIPU_API_KEY",
+  "base_url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+  "models": [
+    {
+      "name": "<model-id>",
+      "context_limit": 1000000
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": true
+}

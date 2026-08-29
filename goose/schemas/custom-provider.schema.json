@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:goose:custom-provider:v1",
+  "$comment": "Target: goose custom provider JSON files under ~/.config/goose/custom_providers/; local Schema v1; source: https://goose-docs.ai/docs/getting-started/providers (Configure Custom Provider); checked 2026-08-29.",
+  "title": "goose custom provider (custom-provider.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "Model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_limit": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "name",
+        "context_limit"
+      ]
+    }
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic",
+        "ollama"
+      ]
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "api_key_env": {
+      "type": "string",
+      "pattern": "^([A-Z][A-Z0-9_]*|<provider-key>)$"
+    },
+    "base_url": {
+      "type": "string",
+      "pattern": "^(https?://.+/chat/completions|<base-url>)$"
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/Model"
+      }
+    },
+    "headers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "supports_streaming": {
+      "type": "boolean"
+    },
+    "requires_auth": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "engine",
+    "display_name",
+    "description",
+    "api_key_env",
+    "base_url",
+    "models",
+    "supports_streaming",
+    "requires_auth"
+  ]
+}

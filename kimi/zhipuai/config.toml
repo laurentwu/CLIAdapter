@@ -1,0 +1,9 @@
+[providers.zhipuai]
+type = "openai"
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+api_key = "<Your API Key>"
+
+[models."<model-id>"]
+provider = "zhipuai"
+model = "<model-id>"
+max_context_size = 1000000

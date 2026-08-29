@@ -1,0 +1,9 @@
+[providers.zai]
+type = "openai"
+base_url = "https://api.z.ai/api/paas/v4"
+api_key = "<Your API Key>"
+
+[models."<model-id>"]
+provider = "zai"
+model = "<model-id>"
+max_context_size = 1000000

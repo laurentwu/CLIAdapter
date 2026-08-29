@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:qwen:settings:v1",
+  "$comment": "Target: Qwen Code settings.json modelProviders format; local Schema v1 subset; source: https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/; checked 2026-08-29.",
+  "title": "Qwen Code settings.json",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "ModelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "envKey": {
+          "type": "string",
+          "pattern": "^([A-Z][A-Z0-9_]*|<provider-key>)$"
+        },
+        "baseUrl": {
+          "type": "string",
+          "pattern": "^(https?://.+|<base-url>)$"
+        },
+        "generationConfig": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "envKey",
+        "baseUrl"
+      ]
+    }
+  },
+  "properties": {
+    "modelProviders": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "$ref": "#/definitions/ModelConfig"
+        }
+      }
+    },
+    "providerProtocol": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "openai",
+          "anthropic",
+          "gemini",
+          "vertex-ai"
+        ]
+      }
+    },
+    "env": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "modelProviders",
+    "providerProtocol",
+    "env"
+  ]
+}
