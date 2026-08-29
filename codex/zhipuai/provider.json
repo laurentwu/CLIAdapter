@@ -2,7 +2,7 @@
   "id": "zhipuai",
   "name": "Zhipu AI",
   "env": ["ZHIPU_API_KEY"],
-  "protocol": "openai-compatible",
-  "base_url": "https://open.bigmodel.cn/api/paas/v4",
+  "protocol": "responses",
+  "base_url": "https://open.bigmodel.cn/api/v1",
   "docs": "https://docs.bigmodel.cn/cn/coding-plan/overview"
 }

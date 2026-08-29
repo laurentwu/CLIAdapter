@@ -3,7 +3,7 @@
   "model": "<model-id>",
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "<Your API Key>",
-    "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
     "ANTHROPIC_MODEL": "<model-id>"
   }
 }

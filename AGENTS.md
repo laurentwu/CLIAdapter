@@ -7,12 +7,13 @@ Static CLI configuration templates with offline JSON Schema validation tests. No
 ## Rules
 
 - `api.json` is the reference catalog and the single source of truth: `provider_id` must be a top-level key, `model_id` must be listed under that provider.
-- Config templates live at three levels; each file resolves by priority (highest first):
-  1. `${cli}/${provider}/${model}/`
-  2. `${cli}/${provider}/`
-  3. `${cli}/`
-- Lower levels are generic fallbacks: provider-level templates keep real provider values and use model placeholders (`<model-id>`, `<model-name>`); cli-level templates also use provider placeholders (`<provider-id>`, `<provider-key>`, `<provider-name>`, `<npm-package>`, `<base-url>`).
+- Config templates live at two levels; each file resolves by priority (highest first):
+  1. `${cli}/${provider}/`
+  2. `${cli}/`
+- There are no model-level directories: available models are read from `api.json` per provider.
+- The cli level is a generic fallback: provider-level templates keep real provider values and use model placeholders (`<model-id>`, `<model-name>`); cli-level templates also use provider placeholders (`<provider-id>`, `<provider-key>`, `<provider-name>`, `<npm-package>`, `<base-url>`).
 - Secrets always use the literal placeholder `<Your API Key>`. Never commit real keys.
+- `provider.json` `base_url` must stay on the same host as the provider's `api` field in `api.json` (guards against provider mix-ups, e.g. bigmodel.cn vs z.ai).
 
 ## Layout
 
@@ -22,4 +23,4 @@ Static CLI configuration templates with offline JSON Schema validation tests. No
 
 ## Testing
 
-Run `npm test` (vitest). Tests validate schemas, api.json membership for every directory, and all three template levels.
+Run `npm test` (vitest). Tests validate schemas, api.json membership for every directory, and both template levels.
