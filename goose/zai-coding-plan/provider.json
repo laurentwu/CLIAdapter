@@ -4,7 +4,7 @@
   "env": [
     "ZHIPU_API_KEY"
   ],
-  "protocol": "openai-compatible",
-  "base_url": "https://api.z.ai/api/coding/paas/v4/chat/completions",
+  "protocol": "anthropic-messages",
+  "base_url": "https://api.z.ai/api/anthropic",
   "docs": "https://docs.z.ai/devpack/overview"
 }

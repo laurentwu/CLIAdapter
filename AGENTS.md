@@ -18,7 +18,7 @@ Static CLI configuration templates with offline JSON Schema validation tests. No
 ## Layout
 
 - `${cli}/schemas/` — local JSON Schemas per config file (crush has none: its `crushrc` is a Bash script validated by text assertions).
-- `${cli}/${provider}/provider.json` — provider metadata (base URL must exclude the client-appended path; codebuddy and goose are exceptions: their configs take the full endpoint URL, so `base_url` includes `/chat/completions`).
+- `${cli}/${provider}/provider.json` — provider metadata (base URL must exclude the client-appended path; codebuddy and OpenAI-compatible goose configs take the full endpoint URL, so `base_url` includes `/chat/completions`; Anthropic goose configs use the `/api/anthropic` endpoint).
 - Per-CLI template files: claude `settings.json`; codex `config.toml` + `models.json` (plus the DeepSeek model-level `models.json` exception); opencode `opencode.json`; pi `settings.json` + `models.json`; qwen `settings.json`; kimi `config.toml`; codebuddy `models.json`; crush `crushrc`; goose `config.yaml` + `custom-provider.json`.
 
 ## Testing
