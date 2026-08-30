@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:cli-config:codex:models:v1",
-  "$comment": "Target: Codex upstream model catalog at commit 5bcd7b0fbcefb41d0caa8db1a212ad7d47cf93ab; local Schema v1 template subset; source: https://raw.githubusercontent.com/openai/codex/5bcd7b0fbcefb41d0caa8db1a212ad7d47cf93ab/codex-rs/models-manager/models.json; checked 2026-08-27. The user-requested max reasoning level is retained.",
+  "$comment": "Target: Codex upstream model catalog at commit 5bcd7b0fbcefb41d0caa8db1a212ad7d47cf93ab; local Schema v1 template subset; source: https://raw.githubusercontent.com/openai/codex/5bcd7b0fbcefb41d0caa8db1a212ad7d47cf93ab/codex-rs/models-manager/models.json; DeepSeek integration supplement: https://api-docs.deepseek.com/quick_start/agent_integrations/codex/; checked upstream 2026-08-27 and DeepSeek 2026-08-29. The user-requested max reasoning level is retained; dynamic model_messages content is intentionally omitted.",
   "title": "Codex models.json",
   "type": "object",
   "additionalProperties": false,
@@ -56,6 +56,53 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "prefer_websockets": {
+          "type": "boolean"
+        },
+        "support_verbosity": {
+          "type": "boolean"
+        },
+        "default_verbosity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "web_search_tool_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supports_image_detail_original": {
+          "type": "boolean"
+        },
+        "tool_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "multi_agent_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "use_responses_lite": {
+          "type": "boolean"
+        },
+        "include_skills_usage_instructions": {
+          "type": "boolean"
+        },
+        "auto_review_model_override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "slug": {
           "type": "string",
           "minLength": 1
@@ -116,9 +163,6 @@
             "detailed"
           ]
         },
-        "support_verbosity": {
-          "type": "boolean"
-        },
         "apply_patch_tool_type": {
           "type": "string",
           "minLength": 1
@@ -139,6 +183,49 @@
           "minimum": 0,
           "maximum": 100
         },
+        "auto_compact_token_limit": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "comp_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reasoning_summary_format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimal_client_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availability_nux": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "upgrade": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "supports_parallel_tool_calls": {
           "type": "boolean"
         },
@@ -147,6 +234,19 @@
           "items": {
             "type": "string"
           }
+        },
+        "supports_search_tool": {
+          "type": "boolean"
+        },
+        "default_service_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "input_modalities": {
           "type": "array",

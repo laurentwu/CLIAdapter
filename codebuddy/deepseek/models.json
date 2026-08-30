@@ -5,12 +5,15 @@
       "name": "<model-name>",
       "vendor": "DeepSeek",
       "apiKey": "<Your API Key>",
-      "maxInputTokens": 1000000,
-      "maxOutputTokens": 384000,
-      "url": "https://api.deepseek.com/chat/completions",
+      "maxInputTokens": 128000,
+      "maxOutputTokens": 8192,
+      "url": "https://api.deepseek.com/v1/chat/completions",
       "supportsToolCall": true,
       "supportsImages": false,
       "supportsReasoning": true
     }
+  ],
+  "availableModels": [
+    "<model-id>"
   ]
 }
