@@ -34,6 +34,12 @@ const allProviders = [
   "opencode-go",
 ];
 
+const codexDeepSeekModelIds = [
+  "deepseek-v4-flash",
+  "deepseek-v4-pro",
+  "deepseek-v4-flash-vision-exp",
+].sort();
+
 const anthropicProviders = new Set([
   "zhipuai",
   "zhipuai-coding-plan",
@@ -43,7 +49,7 @@ const anthropicProviders = new Set([
 
 const coverage: Record<CliId, readonly string[]> = {
   claude: [...allProviders],
-  codex: allProviders.filter((providerId) => providerId !== "deepseek"),
+  codex: [...allProviders],
   opencode: [...allProviders],
   pi: [...allProviders],
   qwen: [...allProviders],
@@ -271,6 +277,16 @@ function assertProviderTemplateIdentity(
 
   if (cli === "claude") {
     const settings = parsedByFile["settings.json"];
+    if (providerId === "deepseek") {
+      const env = parsedByFile["settings.json"]?.env ?? {};
+      expect(env.ANTHROPIC_MODEL).toBe("<model-id>[1m]");
+      expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("<model-id>[1m]");
+      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("<model-id>[1m]");
+      expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("<model-id>");
+      expect(env.CLAUDE_CODE_SUBAGENT_MODEL).toBe("<model-id>");
+      expect(env.CLAUDE_CODE_EFFORT_LEVEL).toBe("max");
+      expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe("786432");
+    }
     assertBaseUrlHost(
       settings?.env?.ANTHROPIC_BASE_URL,
       apiHost,
@@ -287,6 +303,17 @@ function assertProviderTemplateIdentity(
 
   if (cli === "codex") {
     const config = parsedByFile["config.toml"];
+    if (providerId === "deepseek") {
+      expect(config.model).toBe("deepseek-v4-flash");
+      expect(config.model_provider).toBe("deepseek");
+      expect(config.preferred_auth_method).toBe("apikey");
+      expect(config.forced_login_method).toBe("api");
+      expect(config.model_reasoning_effort).toBe("high");
+      expect(config.model_catalog_json).toBe("~/.codex/models.json");
+      expect(config.model_providers.deepseek.name).toBe("deepseek");
+      expect(config.model_providers.deepseek.base_url).toBe("https://api.deepseek.com/");
+      expect(config.model_providers.deepseek.wire_api).toBe("responses");
+    }
     expect(
       Object.keys(config.model_providers as JsonObject),
       `${cli}/${providerId}/config.toml.model_provider must be a declared model_providers key`,
@@ -391,6 +418,14 @@ function assertProviderTemplateIdentity(
         `${cli}/${providerId}/models.json.models[${index}].url must match provider.json base_url`,
       ).toBe(providerInfo.base_url);
     }
+    if (providerId === "deepseek") {
+      expect(config.availableModels).toEqual(["<model-id>"]);
+      for (const model of config.models ?? []) {
+        expect(model.url).toBe("https://api.deepseek.com/v1/chat/completions");
+        expect(model.maxInputTokens).toBe(128000);
+        expect(model.maxOutputTokens).toBe(8192);
+      }
+    }
     return;
   }
 
@@ -489,13 +524,41 @@ describe("repository schemas", () => {
         ).toBeTruthy();
 
         const providerRoot = join(cliRoot, providerId);
+        const modelDirectories = listDirectories(providerRoot);
+        const expectedModelDirectories =
+          cliId === "codex" && providerId === "deepseek"
+            ? codexDeepSeekModelIds
+            : [];
         expect(
-          listDirectories(providerRoot),
-          `${cliId}/${providerId} must not contain model directories; only provider-level templates exist`,
-        ).toEqual([]);
+          modelDirectories,
+          `${cliId}/${providerId} must only contain the explicitly supported model-level directories`,
+        ).toEqual(expectedModelDirectories);
         expect(listFiles(providerRoot)).toEqual(
           [...requiredFiles[cliId], "provider.json"].sort(),
         );
+
+        for (const modelId of modelDirectories) {
+          const modelRoot = join(providerRoot, modelId);
+          expect(
+            listFiles(modelRoot),
+            `${cliId}/${providerId}/${modelId} must contain only models.json`,
+          ).toEqual(["models.json"]);
+          const modelCatalog = validateTemplate(
+            join(modelRoot, "models.json"),
+            "codex/schemas/models.schema.json",
+          );
+          assertNoUnexpectedSecret(modelCatalog);
+          expect(modelCatalog.models).toHaveLength(1);
+          const model = modelCatalog.models[0] as JsonObject;
+          expect(model.slug).toBe(modelId);
+          expect(apiEntry.models).toHaveProperty(modelId);
+          expect(JSON.stringify(model)).not.toContain("<model-id>");
+          expect(JSON.stringify(model)).not.toContain("<model-name>");
+          if (modelId === "deepseek-v4-flash-vision-exp") {
+            expect(model.input_modalities).toContain("image");
+            expect(model.supports_image_detail_original).toBe(true);
+          }
+        }
 
         const providerInfo = readJson(join(providerRoot, "provider.json"));
         expect(providerInfo.id).toBe(providerId);

@@ -5,6 +5,6 @@
     "DEEPSEEK_API_KEY"
   ],
   "protocol": "openai-compatible",
-  "base_url": "https://api.deepseek.com/chat/completions",
-  "docs": "https://api-docs.deepseek.com/quick_start/pricing"
+  "base_url": "https://api.deepseek.com/v1/chat/completions",
+  "docs": "https://api-docs.deepseek.com/quick_start/agent_integrations/workbuddy/"
 }

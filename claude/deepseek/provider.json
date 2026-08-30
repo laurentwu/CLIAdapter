@@ -4,5 +4,5 @@
   "env": ["DEEPSEEK_API_KEY"],
   "protocol": "anthropic-messages",
   "base_url": "https://api.deepseek.com/anthropic",
-  "docs": "https://api-docs.deepseek.com/guides/function_calling/"
+  "docs": "https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/"
 }

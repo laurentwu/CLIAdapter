@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:cli-config:codex:config:v1",
-  "$comment": "Target: Codex upstream config schema at commit a57b398351a803c9ec94e38042bc82f527bed2a4; local Schema v1 subset; source: https://developers.openai.com/codex/config-reference and https://raw.githubusercontent.com/openai/codex/a57b398351a803c9ec94e38042bc82f527bed2a4/codex-rs/core/config.schema.json; checked 2026-08-27. The local template uses the current Responses wire API only.",
+  "$comment": "Target: Codex upstream config schema at commit a57b398351a803c9ec94e38042bc82f527bed2a4; local Schema v1 subset; sources: https://developers.openai.com/codex/config-reference and https://raw.githubusercontent.com/openai/codex/a57b398351a803c9ec94e38042bc82f527bed2a4/codex-rs/core/config.schema.json; DeepSeek integration supplement: https://api-docs.deepseek.com/quick_start/agent_integrations/codex/; checked upstream 2026-08-27 and DeepSeek 2026-08-29. The local template uses the current Responses wire API only.",
   "title": "Codex config.toml (parsed object)",
   "type": "object",
   "additionalProperties": false,
@@ -73,6 +73,14 @@
       "minLength": 1
     },
     "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preferred_auth_method": {
+      "type": "string",
+      "minLength": 1
+    },
+    "forced_login_method": {
       "type": "string",
       "minLength": 1
     },
