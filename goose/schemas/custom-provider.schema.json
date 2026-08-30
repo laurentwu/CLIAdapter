@@ -52,7 +52,7 @@
     },
     "base_url": {
       "type": "string",
-      "pattern": "^(https?://.+/chat/completions|<base-url>)$"
+      "pattern": "^(https?://.+/(chat/completions|anthropic)|<base-url>)$"
     },
     "models": {
       "type": "array",

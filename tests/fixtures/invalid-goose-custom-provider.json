@@ -1,0 +1,16 @@
+{
+  "name": "invalid-goose-provider",
+  "engine": "anthropic",
+  "display_name": "Invalid Goose Provider",
+  "description": "Unsupported endpoint path",
+  "api_key_env": "INVALID_GOOSE_API_KEY",
+  "base_url": "https://open.bigmodel.cn/api/v1/messages",
+  "models": [
+    {
+      "name": "glm-5.2",
+      "context_limit": 200000
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": true
+}

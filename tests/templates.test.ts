@@ -228,6 +228,33 @@ function assertBaseUrlHost(value: unknown, expectedHost: string, label: string):
   ).toBe(expectedHost);
 }
 
+function assertClaudeRecommendedEnvironment(
+  settings: JsonObject,
+  label: string,
+): void {
+  const env = settings.env as JsonObject | undefined;
+  expect(env, `${label}.env must be present`).toBeTruthy();
+  if (!env) return;
+
+  for (const variable of [
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+  ]) {
+    expect(env[variable], `${label}.env.${variable} must use the model placeholder`).toBe(
+      "<model-id>",
+    );
+  }
+  expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW, `${label}.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW`).toBe(
+    "1000000",
+  );
+  expect(
+    env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC,
+    `${label}.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`,
+  ).toBe("1");
+  expect(env.API_TIMEOUT_MS, `${label}.env.API_TIMEOUT_MS`).toBe("3000000");
+}
+
 function assertProviderTemplateIdentity(
   cli: CliId,
   providerId: string,
@@ -236,11 +263,18 @@ function assertProviderTemplateIdentity(
   const apiHost = hostnameOf(apiCatalog[providerId]?.api as string);
 
   if (cli === "claude") {
+    const settings = parsedByFile["settings.json"];
     assertBaseUrlHost(
-      parsedByFile["settings.json"]?.env?.ANTHROPIC_BASE_URL,
+      settings?.env?.ANTHROPIC_BASE_URL,
       apiHost,
       `${cli}/${providerId}/settings.json.env.ANTHROPIC_BASE_URL`,
     );
+    if (providerId === "zhipuai-coding-plan") {
+      assertClaudeRecommendedEnvironment(
+        settings,
+        `${cli}/${providerId}/settings.json`,
+      );
+    }
     return;
   }
 
@@ -369,19 +403,32 @@ function assertProviderTemplateIdentity(
       provider.name,
       `${cli}/${providerId}/custom-provider.json.name must be the provider id`,
     ).toBe(providerId);
+    const usesAnthropic = providerId === "zhipuai-coding-plan";
     expect(
       provider.engine,
-      `${cli}/${providerId}/custom-provider.json.engine must use the OpenAI-compatible engine`,
-    ).toBe("openai");
+      `${cli}/${providerId}/custom-provider.json.engine must use the documented protocol engine`,
+    ).toBe(usesAnthropic ? "anthropic" : "openai");
+    expect(
+      providerInfo.protocol,
+      `${cli}/${providerId}/provider.json.protocol must match the documented protocol`,
+    ).toBe(usesAnthropic ? "anthropic-messages" : "openai-compatible");
     assertBaseUrlHost(
       provider.base_url,
       apiHost,
       `${cli}/${providerId}/custom-provider.json.base_url`,
     );
-    expect(
-      provider.base_url.replace(/\/+$/, "").endsWith("/chat/completions"),
-      `${cli}/${providerId}/custom-provider.json.base_url must be the full chat completions endpoint`,
-    ).toBe(true);
+    const normalizedBaseUrl = provider.base_url.replace(/\/+$/, "");
+    if (usesAnthropic) {
+      expect(
+        normalizedBaseUrl.endsWith("/api/anthropic"),
+        `${cli}/${providerId}/custom-provider.json.base_url must be the Anthropic endpoint`,
+      ).toBe(true);
+    } else {
+      expect(
+        normalizedBaseUrl.endsWith("/chat/completions"),
+        `${cli}/${providerId}/custom-provider.json.base_url must be the full chat completions endpoint`,
+      ).toBe(true);
+    }
     expect(
       provider.base_url,
       `${cli}/${providerId}/custom-provider.json.base_url must match provider.json base_url`,
@@ -520,8 +567,19 @@ describe("fallback configuration templates", () => {
       }
 
       const cliValues: string[] = [];
+      const cliParsedByFile: Record<string, JsonObject> = {};
       for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId] ?? {})) {
-        validateLevelTemplate(join(rootDir, cliId, fileName), schemaPath, cliValues);
+        cliParsedByFile[fileName] = validateLevelTemplate(
+          join(rootDir, cliId, fileName),
+          schemaPath,
+          cliValues,
+        );
+      }
+      if (cliId === "claude") {
+        assertClaudeRecommendedEnvironment(
+          cliParsedByFile["settings.json"],
+          `${cliId}/settings.json`,
+        );
       }
       expect(
         cliValues.some((value) => value.includes("<model-id>")),
@@ -636,6 +694,13 @@ describe("negative validation fixture", () => {
   it("rejects a structurally incomplete OpenCode config", () => {
     const fixture = readJson(join(rootDir, "tests/fixtures/invalid-opencode.json"));
     const validator = getValidator("opencode/schemas/opencode.schema.json");
+    expect(validator(fixture)).toBe(false);
+    expect(validator.errors?.length).toBeGreaterThan(0);
+  });
+
+  it("rejects a Goose custom provider with an unsupported endpoint path", () => {
+    const fixture = readJson(join(rootDir, "tests/fixtures/invalid-goose-custom-provider.json"));
+    const validator = getValidator("goose/schemas/custom-provider.schema.json");
     expect(validator(fixture)).toBe(false);
     expect(validator.errors?.length).toBeGreaterThan(0);
   });

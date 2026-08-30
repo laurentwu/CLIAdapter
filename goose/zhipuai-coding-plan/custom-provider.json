@@ -1,10 +1,10 @@
 {
   "name": "zhipuai-coding-plan",
-  "engine": "openai",
+  "engine": "anthropic",
   "display_name": "Zhipu AI Coding Plan",
-  "description": "Zhipu AI Coding Plan (OpenAI-compatible endpoint)",
+  "description": "Zhipu AI Coding Plan (Anthropic Messages endpoint)",
   "api_key_env": "ZHIPU_API_KEY",
-  "base_url": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+  "base_url": "https://open.bigmodel.cn/api/anthropic",
   "models": [
     {
       "name": "<model-id>",
