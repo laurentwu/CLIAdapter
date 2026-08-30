@@ -1,10 +1,10 @@
 {
   "name": "zai-coding-plan",
-  "engine": "openai",
+  "engine": "anthropic",
   "display_name": "Z.AI Coding Plan",
-  "description": "Z.AI Coding Plan (OpenAI-compatible endpoint)",
+  "description": "Z.AI Coding Plan (Anthropic Messages endpoint)",
   "api_key_env": "ZHIPU_API_KEY",
-  "base_url": "https://api.z.ai/api/coding/paas/v4/chat/completions",
+  "base_url": "https://api.z.ai/api/anthropic",
   "models": [
     {
       "name": "<model-id>",
