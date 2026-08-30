@@ -34,6 +34,13 @@ const allProviders = [
   "opencode-go",
 ];
 
+const anthropicProviders = new Set([
+  "zhipuai",
+  "zhipuai-coding-plan",
+  "zai",
+  "zai-coding-plan",
+]);
+
 const coverage: Record<CliId, readonly string[]> = {
   claude: [...allProviders],
   codex: allProviders.filter((providerId) => providerId !== "deepseek"),
@@ -269,7 +276,7 @@ function assertProviderTemplateIdentity(
       apiHost,
       `${cli}/${providerId}/settings.json.env.ANTHROPIC_BASE_URL`,
     );
-    if (providerId === "zhipuai-coding-plan") {
+    if (anthropicProviders.has(providerId)) {
       assertClaudeRecommendedEnvironment(
         settings,
         `${cli}/${providerId}/settings.json`,
@@ -403,7 +410,7 @@ function assertProviderTemplateIdentity(
       provider.name,
       `${cli}/${providerId}/custom-provider.json.name must be the provider id`,
     ).toBe(providerId);
-    const usesAnthropic = providerId === "zhipuai-coding-plan";
+    const usesAnthropic = anthropicProviders.has(providerId);
     expect(
       provider.engine,
       `${cli}/${providerId}/custom-provider.json.engine must use the documented protocol engine`,
