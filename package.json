@@ -5,6 +5,7 @@
   "description": "Static CLI configuration templates and offline JSON Schema validation tests",
   "type": "module",
   "scripts": {
+    "build": "node scripts/build-dist.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
