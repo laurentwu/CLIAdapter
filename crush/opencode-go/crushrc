@@ -1,3 +1,3 @@
-provider add opencode-go --name "OpenCode Go" --type openai-compat --base-url "https://opencode.ai/zen/go/v1" --api-key "<Your API Key>"
+provider add opencode-go --name "OpenCode Go" --type openai-compat --base-url "https://opencode.ai/zen/go/v1" --api-key "<your-api-key>"
 
 model add opencode-go/<model-id> --name "<model-name>" --context-window 1000000 --default-max-tokens 131072

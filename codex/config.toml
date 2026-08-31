@@ -6,5 +6,5 @@ model_catalog_json = "~/.codex/models.json"
 [model_providers."<provider-key>"]
 name = "<provider-name>"
 base_url = "<base-url>"
-experimental_bearer_token = "<Your API Key>"
+experimental_bearer_token = "<your-api-key>"
 wire_api = "responses"

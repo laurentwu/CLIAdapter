@@ -12,7 +12,7 @@ Static CLI configuration templates with offline JSON Schema validation tests. No
   2. `${cli}/${provider}/`
   3. `${cli}/`
 - Templates may be defined at the CLI, provider, and model levels. The CLI level is a generic fallback and uses provider/model placeholders. Provider-level templates keep real provider values and normally use model placeholders (`<model-id>`, `<model-name>`). Model-level templates, when present, provide concrete model values or overrides; files not present at that level continue to resolve from lower levels. CLI-level templates also use provider placeholders (`<provider-id>`, `<provider-key>`, `<provider-name>`, `<npm-package>`, `<base-url>`).
-- Secrets always use the literal placeholder `<Your API Key>`. Never commit real keys.
+- Secrets always use the literal placeholder `<your-api-key>`. Never commit real keys.
 - `provider.json` `base_url` must stay on the same host as the provider's `api` field in `api.json` (guards against provider mix-ups, e.g. bigmodel.cn vs z.ai).
 
 ## Layout

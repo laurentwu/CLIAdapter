@@ -3,7 +3,7 @@
     "opencode": {
       "baseUrl": "https://opencode.ai/zen/v1",
       "api": "openai-completions",
-      "apiKey": "<Your API Key>",
+      "apiKey": "<your-api-key>",
       "models": [
         {
           "id": "<model-id>",

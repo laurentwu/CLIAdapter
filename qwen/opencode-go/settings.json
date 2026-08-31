@@ -13,6 +13,6 @@
     "opencode-go": "openai"
   },
   "env": {
-    "OPENCODE_API_KEY": "<Your API Key>"
+    "OPENCODE_API_KEY": "<your-api-key>"
   }
 }

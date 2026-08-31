@@ -13,6 +13,6 @@
     "deepseek": "openai"
   },
   "env": {
-    "DEEPSEEK_API_KEY": "<Your API Key>"
+    "DEEPSEEK_API_KEY": "<your-api-key>"
   }
 }

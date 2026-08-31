@@ -214,7 +214,7 @@ function assertNoUnexpectedSecret(value: unknown, path = "$", key?: string): voi
     "experimental_bearer_token",
   ]);
   if (key && secretKeys.has(key)) {
-    expect(value, `${path} must keep the manual placeholder`).toBe("<Your API Key>");
+    expect(value, `${path} must keep the manual placeholder`).toBe("<your-api-key>");
     return;
   }
   if (Array.isArray(value)) {
@@ -365,7 +365,7 @@ function assertProviderTemplateIdentity(
       expect(
         envValue,
         `${cli}/${providerId}/settings.json.env.${envKey} must keep the manual placeholder`,
-      ).toBe("<Your API Key>");
+      ).toBe("<your-api-key>");
     }
     return;
   }
@@ -701,7 +701,7 @@ describe("crush text templates", () => {
         `crush/${providerId}/crushrc must use a model name placeholder`,
       ).toBe(true);
       expect(
-        text.includes("<Your API Key>"),
+        text.includes("<your-api-key>"),
         `crush/${providerId}/crushrc must keep the manual API key placeholder`,
       ).toBe(true);
 
@@ -746,7 +746,7 @@ describe("crush text templates", () => {
       "crush/crushrc must use a provider name placeholder",
     ).toBe(true);
     expect(
-      text.includes("<Your API Key>"),
+      text.includes("<your-api-key>"),
       "crush/crushrc must keep the manual API key placeholder",
     ).toBe(true);
     expect(

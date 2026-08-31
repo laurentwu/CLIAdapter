@@ -1,3 +1,3 @@
-provider add opencode --name "OpenCode Zen" --type openai-compat --base-url "https://opencode.ai/zen/v1" --api-key "<Your API Key>"
+provider add opencode --name "OpenCode Zen" --type openai-compat --base-url "https://opencode.ai/zen/v1" --api-key "<your-api-key>"
 
 model add opencode/<model-id> --name "<model-name>" --context-window 1000000 --default-max-tokens 131072
