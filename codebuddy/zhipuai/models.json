@@ -4,7 +4,7 @@
       "id": "<model-id>",
       "name": "<model-name>",
       "vendor": "Zhipu AI",
-      "apiKey": "<Your API Key>",
+      "apiKey": "<your-api-key>",
       "maxInputTokens": 1000000,
       "maxOutputTokens": 131072,
       "url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",

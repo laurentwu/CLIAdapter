@@ -7,7 +7,7 @@
       "name": "Z.AI",
       "options": {
         "baseURL": "https://api.z.ai/api/paas/v4",
-        "apiKey": "<Your API Key>"
+        "apiKey": "<your-api-key>"
       },
       "models": {
         "<model-id>": {

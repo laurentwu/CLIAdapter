@@ -4,7 +4,7 @@
       "id": "<model-id>",
       "name": "<model-name>",
       "vendor": "DeepSeek",
-      "apiKey": "<Your API Key>",
+      "apiKey": "<your-api-key>",
       "maxInputTokens": 128000,
       "maxOutputTokens": 8192,
       "url": "https://api.deepseek.com/v1/chat/completions",

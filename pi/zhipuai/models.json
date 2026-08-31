@@ -3,7 +3,7 @@
     "zhipuai": {
       "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
       "api": "openai-completions",
-      "apiKey": "<Your API Key>",
+      "apiKey": "<your-api-key>",
       "models": [
         {
           "id": "<model-id>",

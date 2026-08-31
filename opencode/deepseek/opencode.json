@@ -7,7 +7,7 @@
       "name": "DeepSeek",
       "options": {
         "baseURL": "https://api.deepseek.com",
-        "apiKey": "<Your API Key>"
+        "apiKey": "<your-api-key>"
       },
       "models": {
         "<model-id>": {

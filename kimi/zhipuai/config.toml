@@ -1,7 +1,7 @@
 [providers.zhipuai]
 type = "openai"
 base_url = "https://open.bigmodel.cn/api/paas/v4"
-api_key = "<Your API Key>"
+api_key = "<your-api-key>"
 
 [models."<model-id>"]
 provider = "zhipuai"

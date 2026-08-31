@@ -3,7 +3,7 @@
     "zai-coding-plan": {
       "baseUrl": "https://api.z.ai/api/coding/paas/v4",
       "api": "openai-completions",
-      "apiKey": "<Your API Key>",
+      "apiKey": "<your-api-key>",
       "models": [
         {
           "id": "<model-id>",

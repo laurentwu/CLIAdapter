@@ -7,7 +7,7 @@
       "name": "<provider-name>",
       "options": {
         "baseURL": "<base-url>",
-        "apiKey": "<Your API Key>"
+        "apiKey": "<your-api-key>"
       },
       "models": {
         "<model-id>": {

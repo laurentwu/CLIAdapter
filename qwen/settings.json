@@ -13,6 +13,6 @@
     "<provider-id>": "openai"
   },
   "env": {
-    "<provider-key>": "<Your API Key>"
+    "<provider-key>": "<your-api-key>"
   }
 }

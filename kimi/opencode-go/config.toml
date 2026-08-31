@@ -1,7 +1,7 @@
 [providers.opencode-go]
 type = "openai"
 base_url = "https://opencode.ai/zen/go/v1"
-api_key = "<Your API Key>"
+api_key = "<your-api-key>"
 
 [models."<model-id>"]
 provider = "opencode-go"
