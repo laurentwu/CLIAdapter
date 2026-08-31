@@ -4,9 +4,10 @@ import {
   mkdirSync,
   readdirSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const distDirectory = join(projectRoot, "dist");
@@ -32,6 +33,129 @@ function isPublishableSource(sourcePath) {
   return basename !== "api.json" && !pathParts.includes("schemas");
 }
 
+function escapeHtml(value) {
+  return String(value).replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
+}
+
+function collectDirectories(directory) {
+  const directories = [directory];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      directories.push(...collectDirectories(join(directory, entry.name)));
+    }
+  }
+  return directories;
+}
+
+function renderBreadcrumbs(relativeDirectory) {
+  const segments = relativeDirectory ? relativeDirectory.split(sep) : [];
+  const rootHref = "../".repeat(segments.length);
+  const breadcrumbs = [
+    segments.length > 0
+      ? `<a href="${rootHref}">Root</a>`
+      : "<span aria-current=\"page\">Root</span>",
+  ];
+
+  segments.forEach((segment, index) => {
+    const isCurrent = index === segments.length - 1;
+    const label = escapeHtml(segment);
+    if (isCurrent) {
+      breadcrumbs.push(`<span aria-current="page">${label}</span>`);
+    } else {
+      const href = "../".repeat(segments.length - index - 1);
+      breadcrumbs.push(`<a href="${href}">${label}</a>`);
+    }
+  });
+
+  return breadcrumbs.join('<span class="separator" aria-hidden="true">/</span>');
+}
+
+function renderDirectoryIndex(rootDirectory, directory) {
+  const relativeDirectory = relative(rootDirectory, directory);
+  const displayPath = relativeDirectory ? `/${relativeDirectory.split(sep).join("/")}` : "/";
+  const entries = readdirSync(directory, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.name !== "index.html" && (entry.isDirectory() || entry.isFile()),
+    )
+    .sort((left, right) => {
+      const leftIsDirectory = left.isDirectory() ? 0 : 1;
+      const rightIsDirectory = right.isDirectory() ? 0 : 1;
+      return leftIsDirectory - rightIsDirectory || left.name.localeCompare(right.name);
+    });
+
+  const rows = [];
+  if (relativeDirectory) {
+    rows.push(
+      '<li class="entry parent"><span class="icon" aria-hidden="true">↩</span><a href="../">Parent directory</a></li>',
+    );
+  }
+  for (const entry of entries) {
+    const isDirectory = entry.isDirectory();
+    const href = `${encodeURIComponent(entry.name)}${isDirectory ? "/" : ""}`;
+    const icon = isDirectory ? "📁" : "📄";
+    const kind = isDirectory ? "directory" : "file";
+    rows.push(
+      `<li class="entry ${kind}"><span class="icon" aria-hidden="true">${icon}</span><a href="${href}">${escapeHtml(entry.name)}${isDirectory ? "/" : ""}</a></li>`,
+    );
+  }
+
+  const listing = rows.length
+    ? `<ul class="entries">${rows.join("")}</ul>`
+    : '<p class="empty">This directory is empty.</p>';
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Directory listing — ${escapeHtml(displayPath)}</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { margin: 0; padding: 2rem 1rem; background: Canvas; color: CanvasText; }
+      main { width: min(56rem, 100%); margin: 0 auto; }
+      h1 { margin: 0 0 1rem; font-size: 1.6rem; overflow-wrap: anywhere; }
+      nav { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: 1.5rem; color: GrayText; }
+      nav a, nav span { overflow-wrap: anywhere; }
+      .separator { margin: 0 .1rem; }
+      .entries { list-style: none; padding: 0; margin: 0; border-top: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
+      .entry { display: flex; align-items: baseline; gap: .55rem; padding: .65rem .4rem; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+      .entry a { color: LinkText; overflow-wrap: anywhere; }
+      .icon { width: 1.3rem; text-align: center; flex: 0 0 1.3rem; }
+      .parent { margin-bottom: .25rem; }
+      .empty { color: GrayText; }
+      @media (prefers-color-scheme: dark) {
+        .entry a { color: #8ab4f8; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav aria-label="Breadcrumb">${renderBreadcrumbs(relativeDirectory)}</nav>
+      <h1>${escapeHtml(displayPath)}</h1>
+      ${listing}
+    </main>
+  </body>
+</html>
+`;
+}
+
+function generateDirectoryIndexes(distRoot) {
+  for (const directory of collectDirectories(distRoot)) {
+    writeFileSync(join(directory, "index.html"), renderDirectoryIndex(distRoot, directory));
+  }
+}
+
 function assertExpectedSourceLayout() {
   for (const cli of cliDirectories) {
     const sourceDirectory = join(projectRoot, cli);
@@ -45,22 +169,28 @@ function assertExpectedSourceLayout() {
 }
 
 function assertPublishedBoundary() {
-  if (existsSync(join(distDirectory, "api.json"))) {
-    throw new Error("dist must not contain api.json");
-  }
-
-  const unexpectedSchemaDirectories = [];
-  for (const cli of cliDirectories) {
-    const cliDirectory = join(distDirectory, cli);
-    if (readdirSync(cliDirectory, { withFileTypes: true }).some(
-      (entry) => entry.isDirectory() && entry.name === "schemas",
-    )) {
-      unexpectedSchemaDirectories.push(`${cli}/schemas`);
+  const unexpectedPaths = [];
+  for (const directory of collectDirectories(distDirectory)) {
+    const relativeDirectory = relative(distDirectory, directory);
+    if (relativeDirectory.split(sep).includes("schemas")) {
+      unexpectedPaths.push(relativeDirectory);
+    }
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name === "api.json") {
+        unexpectedPaths.push(join(relativeDirectory, entry.name));
+      }
     }
   }
-  if (unexpectedSchemaDirectories.length > 0) {
+  if (unexpectedPaths.length > 0) {
+    throw new Error(`dist contains forbidden published paths: ${unexpectedPaths.join(", ")}`);
+  }
+
+  const missingIndexes = collectDirectories(distDirectory).filter(
+    (directory) => !existsSync(join(directory, "index.html")),
+  );
+  if (missingIndexes.length > 0) {
     throw new Error(
-      `dist must not contain schema directories: ${unexpectedSchemaDirectories.join(", ")}`,
+      `Every published directory must contain index.html: ${missingIndexes.join(", ")}`,
     );
   }
 }
@@ -83,8 +213,19 @@ function build() {
   }
   cpSync(join(projectRoot, "LICENSE"), join(distDirectory, "LICENSE"));
 
+  generateDirectoryIndexes(distDirectory);
   assertPublishedBoundary();
   console.log(`Built ${cliDirectories.length} CLI template trees in dist/`);
 }
 
-build();
+export {
+  collectDirectories,
+  escapeHtml,
+  generateDirectoryIndexes,
+  renderDirectoryIndex,
+};
+
+const invokedScript = process.argv[1]
+  ? pathToFileURL(resolve(process.argv[1])).href === import.meta.url
+  : false;
+if (invokedScript) build();
