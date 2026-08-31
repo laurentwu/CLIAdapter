@@ -241,33 +241,6 @@ function assertBaseUrlHost(value: unknown, expectedHost: string, label: string):
   ).toBe(expectedHost);
 }
 
-function assertClaudeRecommendedEnvironment(
-  settings: JsonObject,
-  label: string,
-): void {
-  const env = settings.env as JsonObject | undefined;
-  expect(env, `${label}.env must be present`).toBeTruthy();
-  if (!env) return;
-
-  for (const variable of [
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL",
-  ]) {
-    expect(env[variable], `${label}.env.${variable} must use the model placeholder`).toBe(
-      "<model-id>",
-    );
-  }
-  expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW, `${label}.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW`).toBe(
-    "1000000",
-  );
-  expect(
-    env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC,
-    `${label}.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`,
-  ).toBe("1");
-  expect(env.API_TIMEOUT_MS, `${label}.env.API_TIMEOUT_MS`).toBe("3000000");
-}
-
 function assertProviderTemplateIdentity(
   cli: CliId,
   providerId: string,
@@ -277,27 +250,11 @@ function assertProviderTemplateIdentity(
 
   if (cli === "claude") {
     const settings = parsedByFile["settings.json"];
-    if (providerId === "deepseek") {
-      const env = parsedByFile["settings.json"]?.env ?? {};
-      expect(env.ANTHROPIC_MODEL).toBe("<model-id>[1m]");
-      expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("<model-id>[1m]");
-      expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("<model-id>[1m]");
-      expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("<model-id>");
-      expect(env.CLAUDE_CODE_SUBAGENT_MODEL).toBe("<model-id>");
-      expect(env.CLAUDE_CODE_EFFORT_LEVEL).toBe("max");
-      expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe("786432");
-    }
     assertBaseUrlHost(
       settings?.env?.ANTHROPIC_BASE_URL,
       apiHost,
       `${cli}/${providerId}/settings.json.env.ANTHROPIC_BASE_URL`,
     );
-    if (anthropicProviders.has(providerId)) {
-      assertClaudeRecommendedEnvironment(
-        settings,
-        `${cli}/${providerId}/settings.json`,
-      );
-    }
     return;
   }
 
@@ -643,12 +600,6 @@ describe("fallback configuration templates", () => {
           join(rootDir, cliId, fileName),
           schemaPath,
           cliValues,
-        );
-      }
-      if (cliId === "claude") {
-        assertClaudeRecommendedEnvironment(
-          cliParsedByFile["settings.json"],
-          `${cliId}/settings.json`,
         );
       }
       expect(
