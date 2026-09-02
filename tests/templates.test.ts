@@ -241,6 +241,23 @@ function assertBaseUrlHost(value: unknown, expectedHost: string, label: string):
   ).toBe(expectedHost);
 }
 
+function assertUrlUsesCanonicalBase(
+  value: unknown,
+  canonicalBase: unknown,
+  label: string,
+): void {
+  expect(typeof value, `${label} must be a URL string`).toBe("string");
+  expect(typeof canonicalBase, `${label} canonical base must be a URL string`).toBe("string");
+  if (typeof value !== "string" || typeof canonicalBase !== "string") return;
+
+  const normalizedValue = value.replace(/\/+$/, "");
+  const normalizedBase = canonicalBase.replace(/\/+$/, "");
+  expect(
+    normalizedValue === normalizedBase || normalizedValue.startsWith(`${normalizedBase}/`),
+    `${label} must use the provider.json canonical base`,
+  ).toBe(true);
+}
+
 function assertProviderTemplateIdentity(
   cli: CliId,
   providerId: string,
@@ -370,10 +387,11 @@ function assertProviderTemplateIdentity(
         model.url.replace(/\/+$/, "").endsWith("/chat/completions"),
         `${cli}/${providerId}/models.json.models[${index}].url must be the full chat completions endpoint`,
       ).toBe(true);
-      expect(
+      assertUrlUsesCanonicalBase(
         model.url,
-        `${cli}/${providerId}/models.json.models[${index}].url must match provider.json base_url`,
-      ).toBe(providerInfo.base_url);
+        providerInfo.base_url,
+        `${cli}/${providerId}/models.json.models[${index}].url`,
+      );
     }
     if (providerId === "deepseek") {
       expect(config.availableModels).toEqual(["<model-id>"]);
@@ -428,10 +446,11 @@ function assertProviderTemplateIdentity(
         `${cli}/${providerId}/custom-provider.json.base_url must be the full chat completions endpoint`,
       ).toBe(true);
     }
-    expect(
+    assertUrlUsesCanonicalBase(
       provider.base_url,
-      `${cli}/${providerId}/custom-provider.json.base_url must match provider.json base_url`,
-    ).toBe(providerInfo.base_url);
+      providerInfo.base_url,
+      `${cli}/${providerId}/custom-provider.json.base_url`,
+    );
     return;
   }
 
@@ -468,6 +487,8 @@ describe("repository schemas", () => {
   });
 
   it("keeps the declared CLI/provider coverage and provider assets", () => {
+    const canonicalEndpoints = new Map<string, string>();
+
     for (const cliId of Object.keys(coverage) as CliId[]) {
       const cliRoot = join(rootDir, cliId);
       const actualProviders = listDirectories(cliRoot).filter((name) => name !== "schemas");
@@ -519,6 +540,7 @@ describe("repository schemas", () => {
 
         const providerInfo = readJson(join(providerRoot, "provider.json"));
         expect(providerInfo.id).toBe(providerId);
+        expect(typeof providerInfo.protocol).toBe("string");
         assertBaseUrlWithoutAppendedSuffix(
           providerInfo.base_url,
           clientAppendedSuffix[cliId],
@@ -532,6 +554,23 @@ describe("repository schemas", () => {
           hostnameOf(providerInfo.base_url),
           `${cliId}/${providerId}/provider.json.base_url must stay on the api.json host to avoid provider mix-ups`,
         ).toBe(hostnameOf(apiEntry?.api as string));
+        if (providerInfo.protocol === "openai-compatible") {
+          expect(
+            providerInfo.base_url,
+            `${cliId}/${providerId}/provider.json.base_url must use the canonical api.json endpoint`,
+          ).toBe(apiEntry.api);
+        }
+
+        const endpointKey = `${providerId}:${providerInfo.protocol}`;
+        const existingEndpoint = canonicalEndpoints.get(endpointKey);
+        if (existingEndpoint) {
+          expect(
+            providerInfo.base_url,
+            `${endpointKey} must use one canonical endpoint across all provider.json files`,
+          ).toBe(existingEndpoint);
+        } else {
+          canonicalEndpoints.set(endpointKey, providerInfo.base_url);
+        }
       }
     }
   });

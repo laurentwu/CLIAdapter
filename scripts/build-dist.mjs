@@ -2,6 +2,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -23,6 +24,109 @@ const cliDirectories = [
   "crush",
   "goose",
 ];
+
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function readJson(filePath) {
+  return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function collectProviders(sourceRoot = projectRoot) {
+  const apiCatalog = readJson(join(sourceRoot, "api.json"));
+  const providers = new Map();
+
+  for (const cli of cliDirectories) {
+    const cliDirectory = join(sourceRoot, cli);
+    const providerDirectories = readdirSync(cliDirectory, { withFileTypes: true })
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          existsSync(join(cliDirectory, entry.name, "provider.json")),
+      )
+      .sort((left, right) => compareStrings(left.name, right.name));
+
+    for (const providerDirectory of providerDirectories) {
+      const providerPath = join(
+        cliDirectory,
+        providerDirectory.name,
+        "provider.json",
+      );
+      const provider = readJson(providerPath);
+
+      if (provider.id !== providerDirectory.name) {
+        throw new Error(
+          `${relative(sourceRoot, providerPath)} id must match its directory name`,
+        );
+      }
+      if (!apiCatalog[provider.id]) {
+        throw new Error(`${provider.id} must be a provider id in api.json`);
+      }
+      if (
+        typeof provider.name !== "string" ||
+        !Array.isArray(provider.env) ||
+        !provider.env.every((value) => typeof value === "string") ||
+        typeof provider.protocol !== "string" ||
+        typeof provider.base_url !== "string"
+      ) {
+        throw new Error(
+          `${relative(sourceRoot, providerPath)} has invalid provider metadata`,
+        );
+      }
+      if (
+        provider.protocol === "openai-compatible" &&
+        provider.base_url !== apiCatalog[provider.id].api
+      ) {
+        throw new Error(
+          `${relative(sourceRoot, providerPath)} must use the canonical api.json endpoint`,
+        );
+      }
+
+      const existing = providers.get(provider.id);
+      if (!existing) {
+        providers.set(provider.id, {
+          id: provider.id,
+          name: provider.name,
+          env: [...provider.env].sort(compareStrings),
+          endpoints: new Map([[provider.protocol, provider.base_url]]),
+        });
+        continue;
+      }
+
+      const normalizedEnv = [...provider.env].sort(compareStrings);
+      if (
+        existing.name !== provider.name ||
+        JSON.stringify(existing.env) !== JSON.stringify(normalizedEnv)
+      ) {
+        throw new Error(`${provider.id} has inconsistent name or env metadata`);
+      }
+
+      const existingUrl = existing.endpoints.get(provider.protocol);
+      if (existingUrl && existingUrl !== provider.base_url) {
+        throw new Error(
+          `${provider.id} has multiple ${provider.protocol} endpoints: ${existingUrl}, ${provider.base_url}`,
+        );
+      }
+      existing.endpoints.set(provider.protocol, provider.base_url);
+    }
+  }
+
+  return [...providers.values()]
+    .sort((left, right) => compareStrings(left.id, right.id))
+    .map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      env: provider.env,
+      endpoints: [...provider.endpoints]
+        .map(([protocol, url]) => ({ protocol, url }))
+        .sort(
+          (left, right) =>
+            compareStrings(left.protocol, right.protocol) ||
+            compareStrings(left.url, right.url),
+        ),
+    }));
+}
 
 function isPublishableSource(sourcePath) {
   const sourceRelativePath = relative(projectRoot, sourcePath);
@@ -212,14 +316,22 @@ function build() {
     });
   }
   cpSync(join(projectRoot, "LICENSE"), join(distDirectory, "LICENSE"));
+  const providers = collectProviders();
+  writeFileSync(
+    join(distDirectory, "providers.json"),
+    `${JSON.stringify(providers, null, 2)}\n`,
+  );
 
   generateDirectoryIndexes(distDirectory);
   assertPublishedBoundary();
-  console.log(`Built ${cliDirectories.length} CLI template trees in dist/`);
+  console.log(
+    `Built ${cliDirectories.length} CLI template trees and ${providers.length} providers in dist/`,
+  );
 }
 
 export {
   collectDirectories,
+  collectProviders,
   escapeHtml,
   generateDirectoryIndexes,
   renderDirectoryIndex,

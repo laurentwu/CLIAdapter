@@ -5,6 +5,6 @@
     "ZHIPU_API_KEY"
   ],
   "protocol": "openai-compatible",
-  "base_url": "https://api.z.ai/api/paas/v4/chat/completions",
+  "base_url": "https://api.z.ai/api/paas/v4",
   "docs": "https://docs.z.ai/guides/overview/pricing"
 }
