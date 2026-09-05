@@ -200,6 +200,16 @@ describe("providers artifact", () => {
     expect(readFileSync(join(distDirectory, "index.html"), "utf8")).toContain(
       'href="providers.json"',
     );
+    expect(existsSync(join(distDirectory, "opencode", "deepseek", "auth.json"))).toBe(
+      true,
+    );
+    expect(
+      readFileSync(join(distDirectory, "opencode", "deepseek", "auth.json"), "utf8"),
+    ).toBe(readFileSync(join(rootDir, "opencode", "deepseek", "auth.json"), "utf8"));
+    expect(
+      existsSync(join(distDirectory, "opencode", "deepseek", "opencode.json")),
+    ).toBe(true);
+    expect(existsSync(join(distDirectory, "opencode", "auth.json"))).toBe(false);
 
     const secondBuild = spawnSync(process.execPath, [buildScript], {
       cwd: rootDir,

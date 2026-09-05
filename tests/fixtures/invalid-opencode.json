@@ -1,3 +1,8 @@
 {
-  "model": "provider/model"
+  "model": "provider/model",
+  "provider": {
+    "provider": {
+      "name": "Incomplete provider"
+    }
+  }
 }

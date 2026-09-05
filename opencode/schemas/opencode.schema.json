@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:cli-config:opencode:config:v1",
-  "$comment": "Target: OpenCode stable v1 configuration format; local Schema v1 offline subset; source: https://dev.opencode.ai/docs/config and https://opencode.ai/config.json; checked 2026-08-27. Remote models.dev references are intentionally replaced with local definitions.",
+  "$comment": "Target: OpenCode stable v1 configuration format; local Schema v1 offline subset covering default model selection for models.dev built-in providers and complete custom provider declarations; source: https://dev.opencode.ai/docs/config and https://opencode.ai/config.json; checked 2026-08-27. Remote models.dev references are intentionally replaced with local definitions.",
   "$ref": "#/$defs/Config",
   "$defs": {
     "ModelReference": {
@@ -107,8 +107,7 @@
         }
       },
       "required": [
-        "model",
-        "provider"
+        "model"
       ]
     }
   }

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cli-config:opencode:auth:v1",
+  "$comment": "Target: OpenCode API key credential storage; local Schema v1 offline subset for repository auth.json templates only; source: https://opencode.ai/docs/providers; checked 2026-09-05. OAuth and well-known credentials are intentionally excluded.",
+  "type": "object",
+  "minProperties": 1,
+  "propertyNames": {
+    "type": "string",
+    "minLength": 1
+  },
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "const": "api"
+      },
+      "key": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "key"
+    ]
+  }
+}
