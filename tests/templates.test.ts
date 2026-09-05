@@ -59,7 +59,7 @@ const coverage: Record<CliId, readonly string[]> = {
   goose: [...allProviders],
 };
 
-const fileSchemas: Partial<Record<CliId, Record<string, string>>> = {
+const cliLevelFileSchemas: Partial<Record<CliId, Record<string, string>>> = {
   claude: {
     "settings.json": "claude/schemas/settings.schema.json",
   },
@@ -89,10 +89,18 @@ const fileSchemas: Partial<Record<CliId, Record<string, string>>> = {
   },
 };
 
+const providerLevelFileSchemas: Partial<Record<CliId, Record<string, string>>> = {
+  ...cliLevelFileSchemas,
+  opencode: {
+    "auth.json": "opencode/schemas/auth.schema.json",
+    "opencode.json": "opencode/schemas/opencode.schema.json",
+  },
+};
+
 const requiredFiles: Record<CliId, readonly string[]> = {
   claude: ["settings.json"],
   codex: ["config.toml", "models.json"],
-  opencode: ["opencode.json"],
+  opencode: ["auth.json", "opencode.json"],
   pi: ["models.json", "settings.json"],
   qwen: ["settings.json"],
   kimi: ["config.toml"],
@@ -304,12 +312,17 @@ function assertProviderTemplateIdentity(
 
   if (cli === "opencode") {
     const config = parsedByFile["opencode.json"];
-    expect(config.model).toBe(`${providerId}/<model-id>`);
-    assertBaseUrlHost(
-      config.provider?.[providerId]?.options?.baseURL,
-      apiHost,
-      `${cli}/${providerId}/opencode.json.provider.${providerId}.options.baseURL`,
-    );
+    const auth = parsedByFile["auth.json"];
+    expect(config).toEqual({
+      $schema: "https://opencode.ai/config.json",
+      model: `${providerId}/<model-id>`,
+    });
+    expect(config.provider).toBeUndefined();
+    expect(Object.keys(auth)).toEqual([providerId]);
+    expect(auth[providerId]).toEqual({
+      type: "api",
+      key: "<your-api-key>",
+    });
     return;
   }
 
@@ -478,9 +491,13 @@ describe("repository schemas", () => {
     for (const cliId of cliIds) {
       expect(existsSync(join(rootDir, cliId)), `${cliId} CLI root must exist`).toBe(true);
     }
-    for (const cliId of Object.keys(fileSchemas) as CliId[]) {
+    for (const cliId of Object.keys(cliLevelFileSchemas) as CliId[]) {
       expect(listDirectories(join(rootDir, cliId))).toContain("schemas");
-      for (const schemaPath of Object.values(fileSchemas[cliId] ?? {})) {
+      const schemaPaths = new Set([
+        ...Object.values(cliLevelFileSchemas[cliId] ?? {}),
+        ...Object.values(providerLevelFileSchemas[cliId] ?? {}),
+      ]);
+      for (const schemaPath of schemaPaths) {
         getValidator(schemaPath);
       }
     }
@@ -607,12 +624,14 @@ describe("fallback configuration templates", () => {
     return parsed;
   }
 
-  for (const cliId of Object.keys(fileSchemas) as CliId[]) {
+  for (const cliId of Object.keys(cliLevelFileSchemas) as CliId[]) {
     it(`validates every ${cliId} provider-level and cli-level template`, () => {
       for (const providerId of coverage[cliId]) {
         const values: string[] = [];
         const parsedByFile: Record<string, JsonObject> = {};
-        for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId] ?? {})) {
+        for (const [fileName, schemaPath] of Object.entries(
+          providerLevelFileSchemas[cliId] ?? {},
+        )) {
           parsedByFile[fileName] = validateLevelTemplate(
             join(rootDir, cliId, providerId, fileName),
             schemaPath,
@@ -634,7 +653,9 @@ describe("fallback configuration templates", () => {
 
       const cliValues: string[] = [];
       const cliParsedByFile: Record<string, JsonObject> = {};
-      for (const [fileName, schemaPath] of Object.entries(fileSchemas[cliId] ?? {})) {
+      for (const [fileName, schemaPath] of Object.entries(
+        cliLevelFileSchemas[cliId] ?? {},
+      )) {
         cliParsedByFile[fileName] = validateLevelTemplate(
           join(rootDir, cliId, fileName),
           schemaPath,
@@ -651,6 +672,30 @@ describe("fallback configuration templates", () => {
         ),
         `${cliId} templates must use provider placeholders`,
       ).toBe(true);
+
+      if (cliId === "opencode") {
+        expect(cliParsedByFile["opencode.json"]).toEqual({
+          $schema: "https://opencode.ai/config.json",
+          model: "<provider-id>/<model-id>",
+          provider: {
+            "<provider-id>": {
+              npm: "<npm-package>",
+              name: "<provider-name>",
+              options: {
+                baseURL: "<base-url>",
+                apiKey: "<your-api-key>",
+              },
+              models: {
+                "<model-id>": {
+                  name: "<model-name>",
+                  reasoning: true,
+                },
+              },
+            },
+          },
+        });
+        expect(existsSync(join(rootDir, "opencode", "auth.json"))).toBe(false);
+      }
     });
   }
 });
@@ -754,6 +799,13 @@ describe("negative validation fixture", () => {
   it("rejects a structurally incomplete OpenCode config", () => {
     const fixture = readJson(join(rootDir, "tests/fixtures/invalid-opencode.json"));
     const validator = getValidator("opencode/schemas/opencode.schema.json");
+    expect(validator(fixture)).toBe(false);
+    expect(validator.errors?.length).toBeGreaterThan(0);
+  });
+
+  it("rejects an incomplete OpenCode API credential", () => {
+    const fixture = readJson(join(rootDir, "tests/fixtures/invalid-opencode-auth.json"));
+    const validator = getValidator("opencode/schemas/auth.schema.json");
     expect(validator(fixture)).toBe(false);
     expect(validator.errors?.length).toBeGreaterThan(0);
   });

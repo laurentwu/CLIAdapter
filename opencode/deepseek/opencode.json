@@ -1,20 +1,4 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "deepseek/<model-id>",
-  "provider": {
-    "deepseek": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "DeepSeek",
-      "options": {
-        "baseURL": "https://api.deepseek.com",
-        "apiKey": "<your-api-key>"
-      },
-      "models": {
-        "<model-id>": {
-          "name": "<model-name>",
-          "reasoning": true
-        }
-      }
-    }
-  }
+  "model": "deepseek/<model-id>"
 }
