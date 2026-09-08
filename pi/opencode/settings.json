@@ -1,5 +1,4 @@
 {
   "defaultProvider": "opencode",
-  "defaultModel": "<model-id>",
-  "defaultThinkingLevel": "high"
+  "defaultModel": "<model-id>"
 }

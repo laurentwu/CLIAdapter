@@ -6,18 +6,7 @@
       "apiKey": "<your-api-key>",
       "models": [
         {
-          "id": "<model-id>",
-          "name": "<model-name>",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 1000000,
-          "maxTokens": 131072,
-          "cost": {
-            "input": 0,
-            "output": 0,
-            "cacheRead": 0,
-            "cacheWrite": 0
-          }
+          "id": "<model-id>"
         }
       ]
     }
