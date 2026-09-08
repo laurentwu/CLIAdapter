@@ -364,7 +364,6 @@ function assertProviderTemplateIdentity(
     expect(settings).toEqual({
       defaultProvider: mapping.provider,
       defaultModel: "<model-id>",
-      defaultThinkingLevel: "high",
     });
 
     if (mapping.kind === "builtin") {
@@ -382,6 +381,12 @@ function assertProviderTemplateIdentity(
     } else {
       expect(Object.keys(models.providers)).toEqual([mapping.provider]);
       const customProvider = models.providers[mapping.provider];
+      expect(customProvider).toEqual({
+        baseUrl: providerInfo.base_url,
+        api: "openai-completions",
+        apiKey: "<your-api-key>",
+        models: [{ id: "<model-id>" }],
+      });
       assertBaseUrlHost(
         customProvider.baseUrl,
         apiHost,
@@ -396,18 +401,7 @@ function assertProviderTemplateIdentity(
       expect(customProvider.api).toBe("openai-completions");
       expect(customProvider.apiKey).toBe("<your-api-key>");
       expect(customProvider.models).toHaveLength(1);
-      expect(customProvider.models[0]).toEqual({
-        id: "<model-id>",
-        name: "<model-name>",
-        reasoning: true,
-        input: ["text"],
-        contextWindow: 1000000,
-        maxTokens: 131072,
-        cost:
-          providerId === "zai"
-            ? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
-            : { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
-      });
+      expect(customProvider.models[0]).toEqual({ id: "<model-id>" });
     }
     return;
   }
@@ -786,6 +780,24 @@ describe("fallback configuration templates", () => {
         });
         expect(existsSync(join(rootDir, "opencode", "auth.json"))).toBe(false);
       }
+
+      if (cliId === "pi") {
+        expect(cliParsedByFile["settings.json"]).toEqual({
+          defaultProvider: "<provider-id>",
+          defaultModel: "<model-id>",
+        });
+        expect(cliParsedByFile["models.json"]).toEqual({
+          providers: {
+            "<provider-id>": {
+              baseUrl: "<base-url>",
+              api: "openai-completions",
+              apiKey: "<your-api-key>",
+              models: [{ id: "<model-id>" }],
+            },
+          },
+        });
+        expect(existsSync(join(rootDir, "pi", "auth.json"))).toBe(false);
+      }
     });
   }
 });
@@ -900,12 +912,57 @@ describe("negative validation fixture", () => {
     expect(validator.errors?.length).toBeGreaterThan(0);
   });
 
-  it("accepts empty PI providers but rejects an incomplete custom provider", () => {
+  it("accepts minimal PI settings and rejects missing, empty, mistyped, or extra fields", () => {
+    const validator = getValidator("pi/schemas/settings.schema.json");
+    expect(
+      validator({
+        defaultProvider: "deepseek",
+        defaultModel: "deepseek-chat",
+      }),
+    ).toBe(true);
+
+    const invalidSettings = [
+      { defaultModel: "deepseek-chat" },
+      { defaultProvider: "deepseek" },
+      { defaultProvider: "", defaultModel: "deepseek-chat" },
+      { defaultProvider: "deepseek", defaultModel: "" },
+      { defaultProvider: 1, defaultModel: "deepseek-chat" },
+      { defaultProvider: "deepseek", defaultModel: false },
+      { defaultProvider: "deepseek", defaultModel: "deepseek-chat", extra: true },
+      {
+        defaultProvider: "deepseek",
+        defaultModel: "deepseek-chat",
+        defaultThinkingLevel: "high",
+      },
+    ];
+    for (const settings of invalidSettings) expect(validator(settings)).toBe(false);
+  });
+
+  it("accepts minimal PI models and rejects incomplete providers or model ids", () => {
     const validator = getValidator("pi/schemas/models.schema.json");
+    const minimalModels = {
+      providers: {
+        custom: {
+          baseUrl: "https://api.example.com",
+          api: "openai-completions",
+          apiKey: "<your-api-key>",
+          models: [{ id: "example-model" }],
+        },
+      },
+    };
+
     expect(validator({ providers: {} })).toBe(true);
+    expect(validator(minimalModels)).toBe(true);
     expect(validator({})).toBe(false);
     expect(validator({ providers: null })).toBe(false);
     expect(validator({ providers: [] })).toBe(false);
+    for (const requiredField of ["baseUrl", "api", "apiKey", "models"]) {
+      const incomplete = JSON.parse(JSON.stringify(minimalModels)) as JsonObject;
+      delete incomplete.providers.custom[requiredField];
+      expect(validator(incomplete), `PI provider without ${requiredField} must fail`).toBe(
+        false,
+      );
+    }
     expect(
       validator({
         providers: {
@@ -913,10 +970,67 @@ describe("negative validation fixture", () => {
             baseUrl: "https://api.example.com",
             api: "openai-completions",
             apiKey: "<your-api-key>",
+            models: [],
           },
         },
       }),
     ).toBe(false);
+    expect(
+      validator({
+        providers: {
+          broken: {
+            baseUrl: "https://api.example.com",
+            api: "openai-completions",
+            apiKey: "<your-api-key>",
+            models: [{}],
+          },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      validator({
+        providers: {
+          broken: {
+            baseUrl: "https://api.example.com",
+            api: "openai-completions",
+            apiKey: "<your-api-key>",
+            models: [{ id: "" }],
+          },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      validator({
+        providers: {
+          broken: {
+            baseUrl: "https://api.example.com",
+            api: "openai-completions",
+            apiKey: "<your-api-key>",
+            models: [{ id: "example-model", unknown: true }],
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps optional PI model property constraints", () => {
+    const validator = getValidator("pi/schemas/models.schema.json");
+    const modelsWith = (model: JsonObject) => ({
+      providers: {
+        custom: {
+          baseUrl: "https://api.example.com",
+          api: "openai-completions",
+          apiKey: "<your-api-key>",
+          models: [model],
+        },
+      },
+    });
+
+    expect(
+      validator(modelsWith({ id: "example-model", reasoning: true, contextWindow: 128000 })),
+    ).toBe(true);
+    expect(validator(modelsWith({ id: "example-model", reasoning: "yes" }))).toBe(false);
+    expect(validator(modelsWith({ id: "example-model", contextWindow: 0 }))).toBe(false);
   });
 
   it("rejects invalid PI API credentials", () => {

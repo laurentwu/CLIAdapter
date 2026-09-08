@@ -218,6 +218,33 @@ describe("providers artifact", () => {
     ).toBe(true);
     expect(existsSync(join(distDirectory, "opencode", "auth.json"))).toBe(false);
 
+    const piSettingsPaths = [
+      "settings.json",
+      "deepseek/settings.json",
+      "opencode/settings.json",
+      "opencode-go/settings.json",
+      "zai-coding-plan/settings.json",
+      "zhipuai-coding-plan/settings.json",
+      "zai/settings.json",
+      "zhipuai/settings.json",
+    ];
+    for (const relativePath of piSettingsPaths) {
+      expect(readFileSync(join(distDirectory, "pi", relativePath), "utf8")).toBe(
+        readFileSync(join(rootDir, "pi", relativePath), "utf8"),
+      );
+    }
+
+    const nonEmptyPiModelsPaths = [
+      "models.json",
+      "zai/models.json",
+      "zhipuai/models.json",
+    ];
+    for (const relativePath of nonEmptyPiModelsPaths) {
+      expect(readFileSync(join(distDirectory, "pi", relativePath), "utf8")).toBe(
+        readFileSync(join(rootDir, "pi", relativePath), "utf8"),
+      );
+    }
+
     const builtinPiProviders = [
       "deepseek",
       "opencode",
