@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:cli-config:pi:models:v1",
-  "$comment": "Target: Pi latest documented custom-model format; local Schema v1; source: https://pi.dev/docs/latest/models; checked 2026-08-27.",
+  "$comment": "Target: PI v0.85.1 models.json format at commit d981de1229ef899957bbe968bc8dcda02a21f477; local Schema v1; source: https://github.com/earendil-works/pi/blob/v0.85.1/packages/coding-agent/src/core/model-config.ts.",
   "title": "Pi models.json",
   "type": "object",
   "additionalProperties": false,
@@ -153,7 +153,6 @@
     },
     "providers": {
       "type": "object",
-      "minProperties": 1,
       "additionalProperties": {
         "$ref": "#/definitions/Provider"
       }

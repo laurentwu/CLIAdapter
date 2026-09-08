@@ -260,15 +260,19 @@ function generateDirectoryIndexes(distRoot) {
   }
 }
 
-function assertExpectedSourceLayout() {
+function assertExpectedSourceLayout(sourceRoot = projectRoot) {
   for (const cli of cliDirectories) {
-    const sourceDirectory = join(projectRoot, cli);
+    const sourceDirectory = join(sourceRoot, cli);
     if (!existsSync(sourceDirectory)) {
       throw new Error(`Expected CLI directory is missing: ${cli}`);
     }
   }
-  if (!existsSync(join(projectRoot, "LICENSE"))) {
+  if (!existsSync(join(sourceRoot, "LICENSE"))) {
     throw new Error("Expected LICENSE file is missing");
+  }
+  const providerMapPath = join(sourceRoot, "pi-provider-map.json");
+  if (!existsSync(providerMapPath)) {
+    throw new Error(`Expected PI provider map is missing: ${providerMapPath}`);
   }
 }
 
@@ -316,6 +320,10 @@ function build() {
     });
   }
   cpSync(join(projectRoot, "LICENSE"), join(distDirectory, "LICENSE"));
+  cpSync(
+    join(projectRoot, "pi-provider-map.json"),
+    join(distDirectory, "pi-provider-map.json"),
+  );
   const providers = collectProviders();
   writeFileSync(
     join(distDirectory, "providers.json"),
@@ -330,6 +338,7 @@ function build() {
 }
 
 export {
+  assertExpectedSourceLayout,
   collectDirectories,
   collectProviders,
   escapeHtml,

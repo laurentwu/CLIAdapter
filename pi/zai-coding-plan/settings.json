@@ -1,5 +1,5 @@
 {
-  "defaultProvider": "zai-coding-plan",
+  "defaultProvider": "zai",
   "defaultModel": "<model-id>",
   "defaultThinkingLevel": "high"
 }

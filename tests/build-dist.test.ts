@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error The production build script is intentionally plain JavaScript.
-import { collectProviders, generateDirectoryIndexes } from "../scripts/build-dist.mjs";
+import { assertExpectedSourceLayout, collectProviders, generateDirectoryIndexes } from "../scripts/build-dist.mjs";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const distDirectory = join(rootDir, "dist");
@@ -188,6 +188,7 @@ describe("providers artifact", () => {
 
   it("writes a deterministic root-level providers.json linked from the index", () => {
     const buildScript = join(rootDir, "scripts", "build-dist.mjs");
+    const sourceProviderMap = readFileSync(join(rootDir, "pi-provider-map.json"), "utf8");
     const firstBuild = spawnSync(process.execPath, [buildScript], {
       cwd: rootDir,
       encoding: "utf8",
@@ -200,6 +201,12 @@ describe("providers artifact", () => {
     expect(readFileSync(join(distDirectory, "index.html"), "utf8")).toContain(
       'href="providers.json"',
     );
+    expect(readFileSync(join(distDirectory, "index.html"), "utf8")).toContain(
+      'href="pi-provider-map.json"',
+    );
+    expect(readFileSync(join(distDirectory, "pi-provider-map.json"), "utf8")).toBe(
+      sourceProviderMap,
+    );
     expect(existsSync(join(distDirectory, "opencode", "deepseek", "auth.json"))).toBe(
       true,
     );
@@ -211,6 +218,41 @@ describe("providers artifact", () => {
     ).toBe(true);
     expect(existsSync(join(distDirectory, "opencode", "auth.json"))).toBe(false);
 
+    const builtinPiProviders = [
+      "deepseek",
+      "opencode",
+      "opencode-go",
+      "zai-coding-plan",
+      "zhipuai-coding-plan",
+    ];
+    for (const providerId of builtinPiProviders) {
+      expect(
+        readFileSync(join(distDirectory, "pi", providerId, "auth.json"), "utf8"),
+      ).toBe(readFileSync(join(rootDir, "pi", providerId, "auth.json"), "utf8"));
+      expect(
+        JSON.parse(readFileSync(join(distDirectory, "pi", providerId, "models.json"), "utf8")),
+      ).toEqual({ providers: {} });
+      expect(
+        readFileSync(join(distDirectory, "pi", providerId, "index.html"), "utf8"),
+      ).toContain('href="auth.json"');
+    }
+    for (const providerId of ["zai", "zhipuai"]) {
+      expect(existsSync(join(distDirectory, "pi", providerId, "auth.json"))).toBe(false);
+      expect(
+        Object.keys(
+          JSON.parse(
+            readFileSync(join(distDirectory, "pi", providerId, "models.json"), "utf8"),
+          ).providers,
+        ),
+      ).toHaveLength(1);
+    }
+    expect(existsSync(join(distDirectory, "pi", "auth.json"))).toBe(false);
+    expect(existsSync(join(distDirectory, "pi", "zai-coding-plan"))).toBe(true);
+    expect(existsSync(join(distDirectory, "pi", "zhipuai-coding-plan"))).toBe(true);
+    expect(existsSync(join(distDirectory, "api.json"))).toBe(false);
+    expect(existsSync(join(distDirectory, "Plan.md"))).toBe(false);
+    expect(existsSync(join(distDirectory, "pi", "schemas"))).toBe(false);
+
     const secondBuild = spawnSync(process.execPath, [buildScript], {
       cwd: rootDir,
       encoding: "utf8",
@@ -220,6 +262,23 @@ describe("providers artifact", () => {
     expect(readFileSync(join(distDirectory, "providers.json"), "utf8")).toBe(
       firstOutput,
     );
+    expect(readFileSync(join(distDirectory, "pi-provider-map.json"), "utf8")).toBe(
+      sourceProviderMap,
+    );
+  });
+
+  it("rejects a missing PI provider map during the source-layout preflight", () => {
+    const root = mkdtempSync(join(tmpdir(), "cli-config-missing-pi-map-"));
+    try {
+      for (const cli of fixtureCliDirectories) mkdirSync(join(root, cli));
+      writeFileSync(join(root, "LICENSE"), "fixture license");
+
+      expect(() => assertExpectedSourceLayout(root)).toThrow(
+        `Expected PI provider map is missing: ${join(root, "pi-provider-map.json")}`,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("rejects an OpenAI-compatible endpoint that differs from api.json", () => {

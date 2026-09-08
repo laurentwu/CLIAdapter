@@ -1,5 +1,5 @@
 {
-  "defaultProvider": "zai",
+  "defaultProvider": "zai-api",
   "defaultModel": "<model-id>",
   "defaultThinkingLevel": "high"
 }

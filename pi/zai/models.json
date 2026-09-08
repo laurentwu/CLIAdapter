@@ -1,6 +1,6 @@
 {
   "providers": {
-    "zai": {
+    "zai-api": {
       "baseUrl": "https://api.z.ai/api/paas/v4",
       "api": "openai-completions",
       "apiKey": "<your-api-key>",
