@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:pi:provider-map:v1",
+  "$comment": "Target: PI v0.85.1 provider identifiers at commit d981de1229ef899957bbe968bc8dcda02a21f477; local Schema v1; source: https://github.com/earendil-works/pi/blob/v0.85.1/packages/ai/src/types.ts.",
+  "title": "PI provider map",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "ProviderId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^<>]+$"
+    },
+    "BuiltinMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "builtin"
+        },
+        "provider": {
+          "$ref": "#/definitions/ProviderId"
+        },
+        "alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/ProviderId"
+          }
+        }
+      },
+      "required": ["kind", "provider"]
+    },
+    "CustomMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "custom"
+        },
+        "provider": {
+          "$ref": "#/definitions/ProviderId"
+        }
+      },
+      "required": ["kind", "provider"]
+    },
+    "Mapping": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/BuiltinMapping"
+        },
+        {
+          "$ref": "#/definitions/CustomMapping"
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "pi": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "0.85.1"
+        },
+        "commit": {
+          "type": "string",
+          "const": "d981de1229ef899957bbe968bc8dcda02a21f477"
+        }
+      },
+      "required": ["version", "commit"]
+    },
+    "mappings": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[^<>]+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/Mapping"
+      }
+    }
+  },
+  "required": ["schemaVersion", "pi", "mappings"]
+}

@@ -24,6 +24,16 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 type ApiCatalog = Record<string, { api?: string; models?: Record<string, unknown> }>;
 const apiCatalog = readJson(join(rootDir, "api.json")) as ApiCatalog;
 
+type PiProviderMapping = {
+  kind: "builtin" | "custom";
+  provider: string;
+  alternatives?: string[];
+};
+type PiProviderMap = {
+  mappings: Record<string, PiProviderMapping>;
+};
+const piProviderMap = readJson(join(rootDir, "pi-provider-map.json")) as PiProviderMap;
+
 const allProviders = [
   "zhipuai",
   "zhipuai-coding-plan",
@@ -108,6 +118,24 @@ const requiredFiles: Record<CliId, readonly string[]> = {
   crush: ["crushrc"],
   goose: ["config.yaml", "custom-provider.json"],
 };
+
+function schemasForProvider(cliId: CliId, providerId: string): Record<string, string> {
+  const schemas = providerLevelFileSchemas[cliId] ?? {};
+  if (cliId === "pi" && piProviderMap.mappings[providerId]?.kind === "builtin") {
+    return {
+      ...schemas,
+      "auth.json": "pi/schemas/auth.schema.json",
+    };
+  }
+  return schemas;
+}
+
+function filesForProvider(cliId: CliId, providerId: string): readonly string[] {
+  if (cliId === "pi" && piProviderMap.mappings[providerId]?.kind === "builtin") {
+    return [...requiredFiles.pi, "auth.json"];
+  }
+  return requiredFiles[cliId];
+}
 
 const clientAppendedSuffix: Record<CliId, string> = {
   claude: "/v1/messages",
@@ -326,6 +354,64 @@ function assertProviderTemplateIdentity(
     return;
   }
 
+  if (cli === "pi") {
+    const mapping = piProviderMap.mappings[providerId];
+    const settings = parsedByFile["settings.json"];
+    const models = parsedByFile["models.json"];
+    const providerInfo = readJson(join(rootDir, cli, providerId, "provider.json"));
+
+    expect(mapping, `${cli}/${providerId} must have a provider mapping`).toBeTruthy();
+    expect(settings).toEqual({
+      defaultProvider: mapping.provider,
+      defaultModel: "<model-id>",
+      defaultThinkingLevel: "high",
+    });
+
+    if (mapping.kind === "builtin") {
+      const auth = parsedByFile["auth.json"];
+      expect(models).toEqual({ providers: {} });
+      expect(Object.keys(auth)).toEqual([mapping.provider]);
+      expect(auth[mapping.provider]).toEqual({
+        type: "api_key",
+        key: "<your-api-key>",
+      });
+      expect(
+        auth[mapping.provider].key,
+        `${cli}/${providerId}/auth.json must keep the manual placeholder`,
+      ).toBe("<your-api-key>");
+    } else {
+      expect(Object.keys(models.providers)).toEqual([mapping.provider]);
+      const customProvider = models.providers[mapping.provider];
+      assertBaseUrlHost(
+        customProvider.baseUrl,
+        apiHost,
+        `${cli}/${providerId}/models.json.providers.${mapping.provider}.baseUrl`,
+      );
+      assertUrlUsesCanonicalBase(
+        customProvider.baseUrl,
+        providerInfo.base_url,
+        `${cli}/${providerId}/models.json.providers.${mapping.provider}.baseUrl`,
+      );
+      expect(customProvider.baseUrl).toBe(providerInfo.base_url);
+      expect(customProvider.api).toBe("openai-completions");
+      expect(customProvider.apiKey).toBe("<your-api-key>");
+      expect(customProvider.models).toHaveLength(1);
+      expect(customProvider.models[0]).toEqual({
+        id: "<model-id>",
+        name: "<model-name>",
+        reasoning: true,
+        input: ["text"],
+        contextWindow: 1000000,
+        maxTokens: 131072,
+        cost:
+          providerId === "zai"
+            ? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+            : { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
+      });
+    }
+    return;
+  }
+
   if (cli === "qwen") {
     const settings = parsedByFile["settings.json"];
     expect(
@@ -497,6 +583,10 @@ describe("repository schemas", () => {
         ...Object.values(cliLevelFileSchemas[cliId] ?? {}),
         ...Object.values(providerLevelFileSchemas[cliId] ?? {}),
       ]);
+      if (cliId === "pi") {
+        schemaPaths.add("pi/schemas/auth.schema.json");
+        schemaPaths.add("pi/schemas/provider-map.schema.json");
+      }
       for (const schemaPath of schemaPaths) {
         getValidator(schemaPath);
       }
@@ -529,7 +619,7 @@ describe("repository schemas", () => {
           `${cliId}/${providerId} must only contain the explicitly supported model-level directories`,
         ).toEqual(expectedModelDirectories);
         expect(listFiles(providerRoot)).toEqual(
-          [...requiredFiles[cliId], "provider.json"].sort(),
+          [...filesForProvider(cliId, providerId), "provider.json"].sort(),
         );
 
         for (const modelId of modelDirectories) {
@@ -630,7 +720,7 @@ describe("fallback configuration templates", () => {
         const values: string[] = [];
         const parsedByFile: Record<string, JsonObject> = {};
         for (const [fileName, schemaPath] of Object.entries(
-          providerLevelFileSchemas[cliId] ?? {},
+          schemasForProvider(cliId, providerId),
         )) {
           parsedByFile[fileName] = validateLevelTemplate(
             join(rootDir, cliId, providerId, fileName),
@@ -808,6 +898,54 @@ describe("negative validation fixture", () => {
     const validator = getValidator("opencode/schemas/auth.schema.json");
     expect(validator(fixture)).toBe(false);
     expect(validator.errors?.length).toBeGreaterThan(0);
+  });
+
+  it("accepts empty PI providers but rejects an incomplete custom provider", () => {
+    const validator = getValidator("pi/schemas/models.schema.json");
+    expect(validator({ providers: {} })).toBe(true);
+    expect(validator({})).toBe(false);
+    expect(validator({ providers: null })).toBe(false);
+    expect(validator({ providers: [] })).toBe(false);
+    expect(
+      validator({
+        providers: {
+          broken: {
+            baseUrl: "https://api.example.com",
+            api: "openai-completions",
+            apiKey: "<your-api-key>",
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects invalid PI API credentials", () => {
+    const validator = getValidator("pi/schemas/auth.schema.json");
+    expect(
+      validator({
+        deepseek: {
+          type: "api_key",
+          key: "<your-api-key>",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      validator({
+        deepseek: {
+          type: "api",
+          key: "<your-api-key>",
+        },
+      }),
+    ).toBe(false);
+    expect(
+      validator({
+        deepseek: {
+          type: "api_key",
+          key: "not-a-placeholder",
+        },
+      }),
+    ).toBe(false);
+    expect(validator({ deepseek: { type: "api_key" } })).toBe(false);
   });
 
   it("rejects a Goose custom provider with an unsupported endpoint path", () => {

@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:pi:auth:v1",
+  "$comment": "Target: PI v0.85.1 auth.json format at commit d981de1229ef899957bbe968bc8dcda02a21f477; local Schema v1; source: https://github.com/earendil-works/pi/blob/v0.85.1/packages/coding-agent/docs/providers.md.",
+  "title": "PI auth.json",
+  "type": "object",
+  "minProperties": 1,
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "type": "string",
+        "const": "api_key"
+      },
+      "key": {
+        "type": "string",
+        "const": "<your-api-key>"
+      }
+    },
+    "required": ["type", "key"]
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "pi": {
+    "version": "0.85.1",
+    "commit": "d981de1229ef899957bbe968bc8dcda02a21f477"
+  },
+  "mappings": {
+    "alibaba-token-plan": {
+      "kind": "builtin",
+      "provider": "qwen-token-plan",
+      "alternatives": ["qwen-token-plan-individual"]
+    },
+    "alibaba-token-plan-cn": {
+      "kind": "builtin",
+      "provider": "qwen-token-plan-cn"
+    },
+    "amazon-bedrock": {
+      "kind": "builtin",
+      "provider": "amazon-bedrock"
+    },
+    "anthropic": {
+      "kind": "builtin",
+      "provider": "anthropic"
+    },
+    "azure": {
+      "kind": "builtin",
+      "provider": "azure-openai-responses"
+    },
+    "azure-cognitive-services": {
+      "kind": "builtin",
+      "provider": "azure-openai-responses"
+    },
+    "baseten": {
+      "kind": "builtin",
+      "provider": "baseten"
+    },
+    "cerebras": {
+      "kind": "builtin",
+      "provider": "cerebras"
+    },
+    "cloudflare-ai-gateway": {
+      "kind": "builtin",
+      "provider": "cloudflare-ai-gateway"
+    },
+    "cloudflare-workers-ai": {
+      "kind": "builtin",
+      "provider": "cloudflare-workers-ai"
+    },
+    "deepseek": {
+      "kind": "builtin",
+      "provider": "deepseek"
+    },
+    "fireworks-ai": {
+      "kind": "builtin",
+      "provider": "fireworks"
+    },
+    "github-copilot": {
+      "kind": "builtin",
+      "provider": "github-copilot"
+    },
+    "google": {
+      "kind": "builtin",
+      "provider": "google"
+    },
+    "google-vertex": {
+      "kind": "builtin",
+      "provider": "google-vertex"
+    },
+    "groq": {
+      "kind": "builtin",
+      "provider": "groq"
+    },
+    "huggingface": {
+      "kind": "builtin",
+      "provider": "huggingface"
+    },
+    "kimi-for-coding": {
+      "kind": "builtin",
+      "provider": "kimi-coding"
+    },
+    "minimax": {
+      "kind": "builtin",
+      "provider": "minimax"
+    },
+    "minimax-cn": {
+      "kind": "builtin",
+      "provider": "minimax-cn"
+    },
+    "mistral": {
+      "kind": "builtin",
+      "provider": "mistral"
+    },
+    "moonshotai": {
+      "kind": "builtin",
+      "provider": "moonshotai"
+    },
+    "moonshotai-cn": {
+      "kind": "builtin",
+      "provider": "moonshotai-cn"
+    },
+    "nvidia": {
+      "kind": "builtin",
+      "provider": "nvidia"
+    },
+    "openai": {
+      "kind": "builtin",
+      "provider": "openai"
+    },
+    "opencode": {
+      "kind": "builtin",
+      "provider": "opencode"
+    },
+    "opencode-go": {
+      "kind": "builtin",
+      "provider": "opencode-go"
+    },
+    "openrouter": {
+      "kind": "builtin",
+      "provider": "openrouter"
+    },
+    "togetherai": {
+      "kind": "builtin",
+      "provider": "together"
+    },
+    "vercel": {
+      "kind": "builtin",
+      "provider": "vercel-ai-gateway"
+    },
+    "xai": {
+      "kind": "builtin",
+      "provider": "xai"
+    },
+    "xiaomi": {
+      "kind": "builtin",
+      "provider": "xiaomi"
+    },
+    "xiaomi-token-plan-ams": {
+      "kind": "builtin",
+      "provider": "xiaomi-token-plan-ams"
+    },
+    "xiaomi-token-plan-cn": {
+      "kind": "builtin",
+      "provider": "xiaomi-token-plan-cn"
+    },
+    "xiaomi-token-plan-sgp": {
+      "kind": "builtin",
+      "provider": "xiaomi-token-plan-sgp"
+    },
+    "zai": {
+      "kind": "custom",
+      "provider": "zai-api"
+    },
+    "zai-coding-plan": {
+      "kind": "builtin",
+      "provider": "zai"
+    },
+    "zhipuai": {
+      "kind": "custom",
+      "provider": "zhipuai"
+    },
+    "zhipuai-coding-plan": {
+      "kind": "builtin",
+      "provider": "zai-coding-cn"
+    }
+  }
+}

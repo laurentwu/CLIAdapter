@@ -1,5 +1,5 @@
 {
-  "defaultProvider": "zhipuai-coding-plan",
+  "defaultProvider": "zai-coding-cn",
   "defaultModel": "<model-id>",
   "defaultThinkingLevel": "high"
 }
