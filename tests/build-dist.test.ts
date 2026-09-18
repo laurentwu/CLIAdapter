@@ -218,6 +218,38 @@ describe("providers artifact", () => {
     ).toBe(true);
     expect(existsSync(join(distDirectory, "opencode", "auth.json"))).toBe(false);
 
+    const claudeSettingsPaths = [
+      "settings.json",
+      "deepseek/settings.json",
+      "opencode/settings.json",
+      "opencode-go/settings.json",
+      "zai/settings.json",
+      "zai-coding-plan/settings.json",
+      "zhipuai/settings.json",
+      "zhipuai-coding-plan/settings.json",
+    ];
+    for (const relativePath of claudeSettingsPaths) {
+      expect(readFileSync(join(distDirectory, "claude", relativePath), "utf8")).toBe(
+        readFileSync(join(rootDir, "claude", relativePath), "utf8"),
+      );
+    }
+
+    const claudeProviderPaths = [
+      "deepseek/provider.json",
+      "opencode/provider.json",
+      "opencode-go/provider.json",
+      "zai/provider.json",
+      "zai-coding-plan/provider.json",
+      "zhipuai/provider.json",
+      "zhipuai-coding-plan/provider.json",
+    ];
+    for (const relativePath of claudeProviderPaths) {
+      expect(readFileSync(join(distDirectory, "claude", relativePath), "utf8")).toBe(
+        readFileSync(join(rootDir, "claude", relativePath), "utf8"),
+      );
+    }
+    expect(existsSync(join(distDirectory, "claude", "schemas"))).toBe(false);
+
     const piSettingsPaths = [
       "settings.json",
       "deepseek/settings.json",
