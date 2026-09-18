@@ -44,6 +44,110 @@ const allProviders = [
   "opencode-go",
 ];
 
+const claudeProviderIds = [
+  "deepseek",
+  "opencode",
+  "opencode-go",
+  "zai",
+  "zai-coding-plan",
+  "zhipuai",
+  "zhipuai-coding-plan",
+] as const;
+type ClaudeProviderId = (typeof claudeProviderIds)[number];
+type ClaudeTemplateId = "cli" | ClaudeProviderId;
+
+const claudeEnvOrder = [
+  "ANTHROPIC_BASE_URL",
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_MODEL",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL",
+  "CLAUDE_CODE_SUBAGENT_MODEL",
+  "CLAUDE_CODE_EFFORT_LEVEL",
+  "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
+  "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+  "API_TIMEOUT_MS",
+] as const;
+
+const claudeExpectedEnv: Record<ClaudeTemplateId, JsonObject> = {
+  cli: {
+    ANTHROPIC_BASE_URL: "<base-url>",
+    ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_SONNET_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_OPUS_MODEL: "<model-id>",
+    CLAUDE_CODE_SUBAGENT_MODEL: "<model-id>",
+  },
+  deepseek: {
+    ANTHROPIC_BASE_URL: "https://api.deepseek.com/anthropic",
+    ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>[1m]",
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_SONNET_MODEL: "<model-id>[1m]",
+    ANTHROPIC_DEFAULT_OPUS_MODEL: "<model-id>[1m]",
+    CLAUDE_CODE_SUBAGENT_MODEL: "<model-id>",
+    CLAUDE_CODE_EFFORT_LEVEL: "max",
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: "786432",
+  },
+  opencode: {
+    ANTHROPIC_BASE_URL: "https://opencode.ai/zen",
+    ANTHROPIC_API_KEY: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>",
+  },
+  "opencode-go": {
+    ANTHROPIC_BASE_URL: "https://opencode.ai/zen/go",
+    ANTHROPIC_API_KEY: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>",
+  },
+  zai: {
+    ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic",
+    ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_SONNET_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_OPUS_MODEL: "<model-id>",
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000000",
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    API_TIMEOUT_MS: "3000000",
+  },
+  "zai-coding-plan": {
+    ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic",
+    ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_SONNET_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_OPUS_MODEL: "<model-id>",
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000000",
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    API_TIMEOUT_MS: "3000000",
+  },
+  zhipuai: {
+    ANTHROPIC_BASE_URL: "https://open.bigmodel.cn/api/anthropic",
+    ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_SONNET_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_OPUS_MODEL: "<model-id>",
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000000",
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    API_TIMEOUT_MS: "3000000",
+  },
+  "zhipuai-coding-plan": {
+    ANTHROPIC_BASE_URL: "https://open.bigmodel.cn/api/anthropic",
+    ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+    ANTHROPIC_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_SONNET_MODEL: "<model-id>",
+    ANTHROPIC_DEFAULT_OPUS_MODEL: "<model-id>",
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000000",
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    API_TIMEOUT_MS: "3000000",
+  },
+};
+
 const codexDeepSeekModelIds = [
   "deepseek-v4-flash",
   "deepseek-v4-pro",
@@ -294,6 +398,68 @@ function assertUrlUsesCanonicalBase(
   ).toBe(true);
 }
 
+function assertClaudeSettingsPolicy(
+  templateId: ClaudeTemplateId,
+  settings: JsonObject,
+  providerInfo?: JsonObject,
+): void {
+  const label = templateId === "cli" ? "claude/settings.json" : `claude/${templateId}/settings.json`;
+  const expectedEnv = claudeExpectedEnv[templateId];
+  const expectedEnvKeys = claudeEnvOrder.filter((key) =>
+    Object.prototype.hasOwnProperty.call(expectedEnv, key),
+  );
+
+  expect(Object.keys(settings), `${label} root key order must remain stable`).toEqual([
+    "$schema",
+    "model",
+    "env",
+  ]);
+  expect(settings.$schema).toBe("https://json.schemastore.org/claude-code-settings.json");
+  expect(settings.model).toBe("<model-id>");
+  expect(Object.keys(settings.env ?? {}), `${label} env key order must remain stable`).toEqual(
+    expectedEnvKeys,
+  );
+  expect(settings.env, `${label} must retain its reviewed provider policy`).toEqual(expectedEnv);
+
+  const authenticationKeys = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"].filter(
+    (key) => Object.prototype.hasOwnProperty.call(settings.env ?? {}, key),
+  );
+  expect(authenticationKeys, `${label} must use exactly one authentication mechanism`).toHaveLength(
+    1,
+  );
+  expect(settings.env[authenticationKeys[0]], `${label} must keep the secret placeholder`).toBe(
+    "<your-api-key>",
+  );
+
+  if (templateId === "cli") {
+    expect(settings.env.ANTHROPIC_BASE_URL).toBe("<base-url>");
+    return;
+  }
+
+  expect(providerInfo, `${label} must have provider metadata`).toBeTruthy();
+  if (!providerInfo) return;
+  expect(providerInfo.protocol, `${label} must use Anthropic Messages metadata`).toBe(
+    "anthropic-messages",
+  );
+  expect(
+    settings.env.ANTHROPIC_BASE_URL,
+    `${label} endpoint must exactly match provider.json.base_url`,
+  ).toBe(providerInfo.base_url);
+  expect(settings.env.ANTHROPIC_BASE_URL.endsWith("/"), `${label} endpoint has a trailing slash`).toBe(
+    false,
+  );
+  assertBaseUrlWithoutAppendedSuffix(
+    settings.env.ANTHROPIC_BASE_URL,
+    "/v1/messages",
+    `${label}.env.ANTHROPIC_BASE_URL`,
+  );
+  assertBaseUrlHost(
+    settings.env.ANTHROPIC_BASE_URL,
+    hostnameOf(apiCatalog[templateId]?.api as string),
+    `${label}.env.ANTHROPIC_BASE_URL`,
+  );
+}
+
 function assertProviderTemplateIdentity(
   cli: CliId,
   providerId: string,
@@ -303,10 +469,11 @@ function assertProviderTemplateIdentity(
 
   if (cli === "claude") {
     const settings = parsedByFile["settings.json"];
-    assertBaseUrlHost(
-      settings?.env?.ANTHROPIC_BASE_URL,
-      apiHost,
-      `${cli}/${providerId}/settings.json.env.ANTHROPIC_BASE_URL`,
+    const providerInfo = readJson(join(rootDir, cli, providerId, "provider.json"));
+    assertClaudeSettingsPolicy(
+      providerId as ClaudeProviderId,
+      settings,
+      providerInfo,
     );
     return;
   }
@@ -674,6 +841,315 @@ describe("repository schemas", () => {
         }
       }
     }
+  });
+});
+
+describe("Claude settings templates", () => {
+  const settingsSchemaPath = "claude/schemas/settings.schema.json";
+
+  function settingsPath(templateId: ClaudeTemplateId): string {
+    return templateId === "cli"
+      ? join(rootDir, "claude", "settings.json")
+      : join(rootDir, "claude", templateId, "settings.json");
+  }
+
+  function cloneJson<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+
+  function minimalSettings(env: JsonObject, extra: JsonObject = {}): JsonObject {
+    return {
+      $schema: "https://json.schemastore.org/claude-code-settings.json",
+      model: "<model-id>",
+      env,
+      ...extra,
+    };
+  }
+
+  function resolveTemplateFile(
+    cliId: string,
+    providerId: string,
+    modelId: string,
+    fileName: string,
+    pathExists: (path: string) => boolean = existsSync,
+  ): string | undefined {
+    return [
+      join(rootDir, cliId, providerId, modelId, fileName),
+      join(rootDir, cliId, providerId, fileName),
+      join(rootDir, cliId, fileName),
+    ].find(pathExists);
+  }
+
+  it("keeps every reviewed template policy, key order, and JSON formatting exact", () => {
+    const templateIds: ClaudeTemplateId[] = ["cli", ...claudeProviderIds];
+
+    for (const templateId of templateIds) {
+      const filePath = settingsPath(templateId);
+      const text = readFileSync(filePath, "utf8");
+      const settings = readJson(filePath);
+      const providerInfo =
+        templateId === "cli"
+          ? undefined
+          : readJson(join(rootDir, "claude", templateId, "provider.json"));
+
+      assertClaudeSettingsPolicy(templateId, settings, providerInfo);
+      expect(text, `${filePath} must use two-space JSON, LF, and one final newline`).toBe(
+        `${JSON.stringify(settings, null, 2)}\n`,
+      );
+      expect(text, `${filePath} must not contain CRLF line endings`).not.toContain("\r");
+    }
+
+    for (const providerId of claudeProviderIds) {
+      const providerPath = join(rootDir, "claude", providerId, "provider.json");
+      const providerInfo = readJson(providerPath);
+      expect(
+        Object.keys(providerInfo),
+        `claude/${providerId}/provider.json metadata key order must remain stable`,
+      ).toEqual(["id", "name", "env", "protocol", "base_url", "docs"]);
+      expect(listDirectories(join(rootDir, "claude", providerId))).toEqual([]);
+    }
+
+    const deepSeek = readJson(settingsPath("deepseek"));
+    expect(deepSeek.model).toBe("<model-id>");
+    expect(deepSeek.env.ANTHROPIC_MODEL).toBe("<model-id>[1m]");
+    expect(deepSeek.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("<model-id>");
+    expect(deepSeek.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("<model-id>[1m]");
+    expect(deepSeek.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("<model-id>[1m]");
+    expect(deepSeek.env.CLAUDE_CODE_SUBAGENT_MODEL).toBe("<model-id>");
+
+    const schemaText = readFileSync(join(rootDir, settingsSchemaPath), "utf8");
+    expect(schemaText).toBe(
+      `${JSON.stringify(readJson(join(rootDir, settingsSchemaPath)), null, 2)}\n`,
+    );
+    expect(schemaText).not.toContain("\r");
+  });
+
+  it("rejects provider-policy regressions through the shared semantic assertion", () => {
+    const openCode = readJson(settingsPath("opencode"));
+    const openCodeProvider = readJson(join(rootDir, "claude", "opencode", "provider.json"));
+
+    // Both official Messages routes read x-api-key at this pinned revision:
+    // https://github.com/anomalyco/opencode/blob/3dd1b3053979971d8eb03ef37b29de07b892d95c/packages/console/app/src/routes/zen/v1/messages.ts#L9
+    // https://github.com/anomalyco/opencode/blob/3dd1b3053979971d8eb03ef37b29de07b892d95c/packages/console/app/src/routes/zen/go/v1/messages.ts#L9
+    const bearerOpenCode = cloneJson(openCode);
+    delete bearerOpenCode.env.ANTHROPIC_API_KEY;
+    bearerOpenCode.env.ANTHROPIC_AUTH_TOKEN = "<your-api-key>";
+    expect(() =>
+      assertClaudeSettingsPolicy("opencode", bearerOpenCode, openCodeProvider),
+    ).toThrow();
+
+    for (const wrongEndpoint of [
+      "https://opencode.ai/not-zen",
+      "https://opencode.ai/zen/v1",
+      "https://opencode.ai/zen/v1/messages/v1/messages",
+    ]) {
+      const changedEndpoint = cloneJson(openCode);
+      changedEndpoint.env.ANTHROPIC_BASE_URL = wrongEndpoint;
+      expect(
+        () => assertClaudeSettingsPolicy("opencode", changedEndpoint, openCodeProvider),
+        `${wrongEndpoint} must not pass the Claude endpoint policy`,
+      ).toThrow();
+    }
+
+    const deepSeek = readJson(settingsPath("deepseek"));
+    const deepSeekProvider = readJson(join(rootDir, "claude", "deepseek", "provider.json"));
+    for (const [field, wrongValue] of [
+      ["ANTHROPIC_MODEL", "<model-id>"],
+      ["ANTHROPIC_DEFAULT_HAIKU_MODEL", "<model-id>[1m]"],
+      ["CLAUDE_CODE_SUBAGENT_MODEL", "<model-id>[1m]"],
+    ] as const) {
+      const changedModel = cloneJson(deepSeek);
+      changedModel.env[field] = wrongValue;
+      expect(
+        () => assertClaudeSettingsPolicy("deepseek", changedModel, deepSeekProvider),
+        `DeepSeek ${field} regression must fail`,
+      ).toThrow();
+    }
+
+    const glmProviders = ["zai", "zai-coding-plan", "zhipuai", "zhipuai-coding-plan"] as const;
+    const glmRuntimeFields = [
+      "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "API_TIMEOUT_MS",
+    ] as const;
+    for (const providerId of glmProviders) {
+      const settings = readJson(settingsPath(providerId));
+      const providerInfo = readJson(join(rootDir, "claude", providerId, "provider.json"));
+      for (const field of glmRuntimeFields) {
+        const missingParameter = cloneJson(settings);
+        delete missingParameter.env[field];
+        expect(
+          () => assertClaudeSettingsPolicy(providerId, missingParameter, providerInfo),
+          `${providerId} must retain ${field}`,
+        ).toThrow();
+      }
+    }
+
+    const reorderedRoot = {
+      model: deepSeek.model,
+      $schema: deepSeek.$schema,
+      env: deepSeek.env,
+    };
+    expect(() =>
+      assertClaudeSettingsPolicy("deepseek", reorderedRoot, deepSeekProvider),
+    ).toThrow();
+
+    const reorderedEnv = cloneJson(deepSeek);
+    reorderedEnv.env = Object.fromEntries(Object.entries(reorderedEnv.env).reverse());
+    expect(() =>
+      assertClaudeSettingsPolicy("deepseek", reorderedEnv, deepSeekProvider),
+    ).toThrow();
+  });
+
+  it("accepts both authentication modes, compression boundaries, URLs, and overrides", () => {
+    const validator = getValidator(settingsSchemaPath);
+    const schema = readJson(join(rootDir, settingsSchemaPath));
+
+    expect(schema.$id).toBe("urn:cli-config:claude:settings:v2");
+    expect(schema.$comment).toContain("2026-09-18");
+    expect(schema.$comment).toContain("https://code.claude.com/docs/en/settings");
+    expect(schema.$comment).toContain("https://code.claude.com/docs/en/model-config");
+    expect(schema.$comment).toContain("https://code.claude.com/docs/en/env-vars");
+
+    expect(
+      validator(
+        minimalSettings(
+          {
+            ANTHROPIC_BASE_URL: "<base-url>",
+            ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+            ANTHROPIC_MODEL: "example-model",
+            CLAUDE_CODE_EFFORT_LEVEL: "auto",
+            CLAUDE_CODE_AUTO_COMPACT_WINDOW: "100000",
+            CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "enabled",
+            API_TIMEOUT_MS: "1",
+          },
+          { modelOverrides: { sonnet: "example-sonnet" } },
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      validator(
+        minimalSettings({
+          ANTHROPIC_BASE_URL: "https://api.example.com/anthropic",
+          ANTHROPIC_API_KEY: "<your-api-key>",
+          ANTHROPIC_MODEL: "example-model",
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: "example-haiku",
+          ANTHROPIC_DEFAULT_SONNET_MODEL: "example-sonnet",
+          ANTHROPIC_DEFAULT_OPUS_MODEL: "example-opus",
+          CLAUDE_CODE_SUBAGENT_MODEL: "example-subagent",
+          CLAUDE_CODE_EFFORT_LEVEL: "max",
+          CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000000",
+          API_TIMEOUT_MS: "3000000",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects invalid authentication, fields, types, URLs, and tuning values", () => {
+    const validator = getValidator(settingsSchemaPath);
+    const validEnv = {
+      ANTHROPIC_BASE_URL: "https://api.example.com/anthropic",
+      ANTHROPIC_AUTH_TOKEN: "<your-api-key>",
+      ANTHROPIC_MODEL: "example-model",
+    };
+    const invalidSettings: Array<[string, JsonObject]> = [
+      [
+        "missing authentication",
+        minimalSettings({
+          ANTHROPIC_BASE_URL: "https://api.example.com/anthropic",
+          ANTHROPIC_MODEL: "example-model",
+        }),
+      ],
+      [
+        "duplicate authentication",
+        minimalSettings({ ...validEnv, ANTHROPIC_API_KEY: "<your-api-key>" }),
+      ],
+      [
+        "wrong API key placeholder",
+        minimalSettings({
+          ANTHROPIC_BASE_URL: "https://api.example.com/anthropic",
+          ANTHROPIC_API_KEY: "real-or-fake-key",
+          ANTHROPIC_MODEL: "example-model",
+        }),
+      ],
+      [
+        "wrong token placeholder",
+        minimalSettings({ ...validEnv, ANTHROPIC_AUTH_TOKEN: "real-or-fake-key" }),
+      ],
+      ["unknown root field", { ...minimalSettings(validEnv), unknown: true }],
+      ["unknown env field", minimalSettings({ ...validEnv, UNKNOWN: "value" })],
+      [
+        "misspelled env field",
+        minimalSettings({ ...validEnv, ANTHROPIC_MODELL: "example-model" }),
+      ],
+      ["non-object env", minimalSettings("not-an-object" as unknown as JsonObject)],
+      ["non-string env value", minimalSettings({ ...validEnv, ANTHROPIC_MODEL: 1 })],
+      ["empty top-level model", { ...minimalSettings(validEnv), model: "" }],
+      ["empty env model", minimalSettings({ ...validEnv, ANTHROPIC_MODEL: "" })],
+      ["invalid URL scheme", minimalSettings({ ...validEnv, ANTHROPIC_BASE_URL: "ftp://api.example.com" })],
+      ["URL containing whitespace", minimalSettings({ ...validEnv, ANTHROPIC_BASE_URL: "https://api.example.com/a b" })],
+      ["invalid effort", minimalSettings({ ...validEnv, CLAUDE_CODE_EFFORT_LEVEL: "extreme" })],
+      ["compression below range", minimalSettings({ ...validEnv, CLAUDE_CODE_AUTO_COMPACT_WINDOW: "99999" })],
+      ["compression above range", minimalSettings({ ...validEnv, CLAUDE_CODE_AUTO_COMPACT_WINDOW: "1000001" })],
+      ["compression with unit", minimalSettings({ ...validEnv, CLAUDE_CODE_AUTO_COMPACT_WINDOW: "100000ms" })],
+      ["numeric compression", minimalSettings({ ...validEnv, CLAUDE_CODE_AUTO_COMPACT_WINDOW: 100000 })],
+      ["zero timeout", minimalSettings({ ...validEnv, API_TIMEOUT_MS: "0" })],
+      ["decimal timeout", minimalSettings({ ...validEnv, API_TIMEOUT_MS: "1.5" })],
+      ["numeric timeout", minimalSettings({ ...validEnv, API_TIMEOUT_MS: 1 })],
+      ["empty override", minimalSettings(validEnv, { modelOverrides: { sonnet: "" } })],
+    ];
+
+    for (const [label, settings] of invalidSettings) {
+      expect(validator(settings), label).toBe(false);
+    }
+  });
+
+  it("resolves each settings or provider file by model, provider, then CLI fallback", () => {
+    const deepSeekModelId = Object.keys(apiCatalog.deepseek.models ?? {})[0];
+    expect(deepSeekModelId).toBeTruthy();
+    if (!deepSeekModelId) return;
+
+    expect(
+      resolveTemplateFile("claude", "deepseek", deepSeekModelId, "settings.json"),
+    ).toBe(join(rootDir, "claude", "deepseek", "settings.json"));
+    expect(
+      resolveTemplateFile("claude", "deepseek", deepSeekModelId, "provider.json"),
+    ).toBe(join(rootDir, "claude", "deepseek", "provider.json"));
+
+    const modelSettings = join(
+      rootDir,
+      "claude",
+      "deepseek",
+      deepSeekModelId,
+      "settings.json",
+    );
+    const providerSettings = join(rootDir, "claude", "deepseek", "settings.json");
+    const cliSettings = join(rootDir, "claude", "settings.json");
+    const allSettingsLevels = new Set([modelSettings, providerSettings, cliSettings]);
+    expect(
+      resolveTemplateFile(
+        "claude",
+        "deepseek",
+        deepSeekModelId,
+        "settings.json",
+        (path) => allSettingsLevels.has(path),
+      ),
+    ).toBe(modelSettings);
+
+    const cliOnly = new Set([cliSettings]);
+    expect(
+      resolveTemplateFile("claude", "missing", "missing", "settings.json", (path) =>
+        cliOnly.has(path),
+      ),
+    ).toBe(cliSettings);
+
+    const cliProvider = join(rootDir, "claude", "provider.json");
+    const providerFallbackOnly = new Set([cliProvider]);
+    expect(
+      resolveTemplateFile("claude", "missing", "missing", "provider.json", (path) =>
+        providerFallbackOnly.has(path),
+      ),
+    ).toBe(cliProvider);
   });
 });
 

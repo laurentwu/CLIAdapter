@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "urn:cli-config:claude:settings:v1",
-  "$comment": "Target: Claude Code 2.x settings format; local Schema v1; source: https://code.claude.com/docs/en/configuration; checked 2026-08-27.",
-  "title": "Claude Code settings",
+  "$id": "urn:cli-config:claude:settings:v2",
+  "$comment": "Local Claude Code settings template subset v2; reviewed 2026-09-18 against https://code.claude.com/docs/en/settings, https://code.claude.com/docs/en/model-config, and https://code.claude.com/docs/en/env-vars. This is not a complete Claude Code settings schema or a compatibility guarantee for every Claude Code 2.x release.",
+  "title": "Claude Code settings template subset",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "$schema": {
-      "type": "string"
+      "const": "https://json.schemastore.org/claude-code-settings.json"
     },
     "model": {
       "type": "string",
@@ -16,17 +16,101 @@
     "modelOverrides": {
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       }
     },
     "env": {
       "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
+      "additionalProperties": false,
+      "properties": {
+        "ANTHROPIC_BASE_URL": {
+          "anyOf": [
+            {
+              "const": "<base-url>"
+            },
+            {
+              "type": "string",
+              "pattern": "^https?://[^\\s]+$"
+            }
+          ]
+        },
+        "ANTHROPIC_API_KEY": {
+          "const": "<your-api-key>"
+        },
+        "ANTHROPIC_AUTH_TOKEN": {
+          "const": "<your-api-key>"
+        },
+        "ANTHROPIC_MODEL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "CLAUDE_CODE_SUBAGENT_MODEL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "CLAUDE_CODE_EFFORT_LEVEL": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "auto"
+          ]
+        },
+        "CLAUDE_CODE_AUTO_COMPACT_WINDOW": {
+          "type": "string",
+          "pattern": "^(?:[1-9][0-9]{5}|1000000)$"
+        },
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": {
+          "type": "string",
+          "minLength": 1
+        },
+        "API_TIMEOUT_MS": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        }
+      },
+      "required": [
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_MODEL"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "ANTHROPIC_API_KEY": {}
+          },
+          "required": [
+            "ANTHROPIC_API_KEY"
+          ]
+        },
+        {
+          "properties": {
+            "ANTHROPIC_AUTH_TOKEN": {}
+          },
+          "required": [
+            "ANTHROPIC_AUTH_TOKEN"
+          ]
+        }
+      ]
     }
   },
   "required": [
+    "$schema",
     "model",
     "env"
   ]
