@@ -2,34 +2,59 @@
 
 ## Overview
 
-Static CLI configuration templates with offline JSON Schema validation tests. No runtime code.
+Static CLI configuration templates with offline validation and a publishing script. There is no application runtime.
 
-## Rules
+## Repository layout
 
-- `api.json` is the reference catalog and the single source of truth: `provider_id` must be a top-level key, `model_id` must be listed under that provider.
-- Config templates live at three levels; each file resolves by priority (highest first):
-  1. `${cli}/${provider}/${model}/`
-  2. `${cli}/${provider}/`
-  3. `${cli}/`
-- Templates may be defined at the CLI, provider, and model levels. The CLI level is a generic fallback and uses provider/model placeholders. Provider-level templates keep real provider values and normally use model placeholders (`<model-id>`, `<model-name>`). Model-level templates, when present, provide concrete model values or overrides; files not present at that level continue to resolve from lower levels. CLI-level templates also use provider placeholders (`<provider-id>`, `<provider-key>`, `<provider-name>`, `<npm-package>`, `<base-url>`).
-- Secrets always use the literal placeholder `<your-api-key>`. Never commit real keys.
-- `provider.json` `base_url` is the canonical endpoint for its protocol. Every `provider.json` file for the same provider and protocol must use the same value; `openai-compatible` values must exactly match the provider's `api` field in `api.json`.
-- OpenCode providers present in `api.json`/models.dev use provider-level `auth.json` for credentials and provider-level `opencode.json` only to select the default model. Only the CLI-level fallback declares a custom provider through `opencode.json.provider`.
-- `pi-provider-map.json` maps an `api.json` source provider ID to the PI-internal provider ID. Its source keys stay sorted, must exist in `api.json`, and use `kind: "builtin"` only for IDs verified against PI `v0.85.1` (`d981de1229ef899957bbe968bc8dcda02a21f477`). Missing mappings are unknown, not inferred by brand or name. A model placeholder must be replaced with an ID present both in the source provider's `api.json` catalog and the selected PI version; do not invent aliases or custom models when PI lacks that model.
-- The seven existing PI provider directories split into five builtin templates (`deepseek`, `opencode`, `opencode-go`, `zai-coding-plan`, `zhipuai-coding-plan`) and two custom templates (`zai`, `zhipuai`). All PI `settings.json` templates only select the default provider and model. Generic and custom `models.json` model entries only declare `id`; other model properties use PI defaults. Builtin templates use the mapped PI ID consistently in `settings.json` and `auth.json`, while their required `models.json` is exactly an empty `providers` object so per-file resolution cannot fall back to the CLI-level custom-provider template. Custom templates keep credentials in `models.json` and have no `auth.json`; ordinary pay-as-you-go `zai` uses the collision-free internal ID `zai-api`, because PI's builtin `zai` means the international Coding Plan.
+- `cli/` contains the CLI source trees. Every direct child directory is a CLI; there is no supported-CLI allowlist in tests or build code.
+- `cli/<cli>/cli.json` describes that CLI's template files: purpose, format, local Schema, allowed levels, and required locations. It does not list supported providers/models or duplicate template values.
+- `cli/<cli>/schemas/` contains local Schemas. JSON, TOML, and YAML templates are parsed before validation; text templates are validated as strings.
+- `cli/<cli>/<file>` is a generic CLI-level fallback template declared by `cli.json`.
+- `cli/<cli>/<provider>/provider.json` is required provider metadata, not a client configuration file. Its ID must match its directory and a top-level key in `api.json`.
+- `cli/<cli>/<provider>/<file>` contains provider-level templates declared by `cli.json`.
+- `cli/<cli>/<provider>/<model>/<file>` contains optional model-specific overrides. Model IDs must belong to that provider in `api.json`; IDs containing `/` use their relative path as the full ID. Intermediate directories are allowed only on the way to an existing model template.
+- `schemas/` contains shared repository Schemas, including CLI declarations, provider metadata, and provider maps.
+- `api.json` is the reference catalog and single source of truth for source provider/model IDs and OpenAI-compatible endpoints.
+- `pi-provider-map.json` maps source provider IDs to PI-internal identities. It never changes source directory names or published lookup paths.
+- `tests/` contains generic validation tests, independent fixtures, and versioned offline compatibility data. `scripts/` contains discovery and publishing utilities.
+- `dist/` is generated and must not be committed. Do not create planning documents as part of implementation.
 
-## Layout
+## File declarations and placement
 
-- `${cli}/schemas/` — local JSON Schemas per config file (crush has none: its `crushrc` is a Bash script validated by text assertions).
-- `${cli}/${provider}/provider.json` — provider metadata with a protocol-level canonical endpoint. CLI configuration files may still use a client-specific full request URL (for example, codebuddy and OpenAI-compatible goose configs include `/chat/completions`).
-- Per-CLI template files: claude `settings.json`; codex `config.toml` + `models.json`; opencode CLI-level fallback `opencode.json` and provider-level `auth.json` + `opencode.json`; pi CLI-level fallback `settings.json` + `models.json`, builtin provider-level `settings.json` + `auth.json` + empty `models.json`, and custom provider-level `settings.json` + `models.json`; qwen `settings.json`; kimi `config.toml`; codebuddy `models.json`; crush `crushrc`; goose `config.yaml` + `custom-provider.json`. Model-level directories, when present, contain only the files needed for model-specific values or overrides.
-- PI source directories and every `provider.json.id` always use the models.dev source ID, even when `pi-provider-map.json` selects a differently named PI builtin. External consumers resolve each file independently at `${cli}/${provider}/${model}/`, `${cli}/${provider}/`, then `${cli}/`; the map changes rendered PI-internal references, never lookup paths.
+- Discover CLI IDs from `cli/`, and providers/models within each CLI. Different CLIs may contain different providers and models. Adding or removing a whole CLI/provider must not require editing test or build allowlists.
+- Every CLI must have a valid `cli.json`. Discover all directories before checking declarations: missing or invalid declarations must fail, not silently exclude a directory.
+- Template filenames are single path components. `cli.json`, `provider.json`, and `schemas` are reserved. Undeclared files, misplaced metadata, and unsupported nesting fail validation.
+- CLI trees belong under `cli/`; their directory names must not conflict with published root artifacts such as `providers.json` or `index.html`.
+- A declaration's `levels` controls where a file may physically appear; `requiredAt` controls where it must physically exist. Model directories may override any permitted subset of files.
+- A CLI can optionally reference a provider map. File declarations may use generic provider kinds to restrict applicability or select a Schema; do not enumerate provider IDs in these rules. Missing required mappings are errors, never inferred from names.
+- Schema paths must resolve locally under the CLI's `schemas/` directory. All Schemas must compile offline, define `$id` and `$comment`, and have no remote `$ref` dependencies.
+- Resolve each template file independently, highest priority first:
+  1. `cli/<cli>/<provider>/<model>/<file>`
+  2. `cli/<cli>/<provider>/<file>`
+  3. `cli/<cli>/<file>`
+- CLI-level templates use provider/model placeholders. Provider-level templates use real provider identities and normally model placeholders. Model-level overrides use concrete model values; absent files resolve from lower levels.
+- Secrets use the literal `<your-api-key>`. Never commit real keys.
+
+## Metadata and compatibility
+
+- `provider.json.base_url` is the canonical endpoint for its protocol. The same provider and protocol must use the same endpoint everywhere. For `openai-compatible`, it must exactly match the provider's `api` field in `api.json`.
+- Client configurations may use full request URLs where their format requires them. Metadata continues to hold the canonical protocol endpoint.
+- PI map source keys are sorted and must exist in `api.json`. Builtin targets and alternatives must be present in versioned offline KnownProvider data; custom identities must not collide with builtin IDs. The map and compatibility data must identify the same version and commit.
+- KnownProvider data is an upstream compatibility reference, not a list of providers this repository must support. Do not duplicate it as expected arrays or require a fixed mapping count.
+- PI builtin credentials belong in `auth.json`. A provider-level empty `models.json` blocks fallback to the generic custom-provider template. Custom providers keep credentials in `models.json` and have no `auth.json`. Declare these file/kind rules and Schema differences in `cli.json`, rather than branching on provider names in tests.
+- Concrete PI models must be available in both the source catalog and selected PI version; do not invent aliases to fill catalog gaps.
 
 ## Publishing
 
-- `scripts/build-dist.mjs` copies templates, `LICENSE`, and `pi-provider-map.json` verbatim into `dist/`, then generates directory indexes and `providers.json`. It does not transform PI configs or add PI fields to `providers.json`.
-- `api.json`, schemas, tests, and planning documents are source-only. `dist/` is generated and must not be committed.
+- Discover CLI trees from `cli/` and publish them as `dist/<cli>/...`. The source-only `cli/` parent must not appear in published URLs.
+- Copy declared templates, provider metadata, `LICENSE`, and `pi-provider-map.json` verbatim. Generate directory indexes and `providers.json` from discovered data without transforming client configurations.
+- `cli.json`, `api.json`, Schemas, tests, scripts, and documentation are source-only. Publish only the declared templates and provider metadata, explicitly named root artifacts, and generated indexes/catalog.
+- Preserve existing published paths and index presentation when changing source organization.
 
 ## Testing
 
-Run `npm test` (vitest). Tests validate schemas, api.json membership for every directory, and all applicable template levels.
+- Run `npm test` for offline validation and `npm run build` to verify publishing.
+- Validate declarations, placement, required files, local Schemas, catalog membership, metadata/reference consistency, independent per-file fallback, and published output.
+- Do not assert fixed supported CLI/provider/model lists, provider counts, protocol counts, complete configuration snapshots, chosen model/tuning defaults, JSON key order, or review dates. Schema constraints describe valid formats, not copies of today's template values.
+- Use independent synthetic fixtures to show that new CLI/provider directories are discovered without test changes and that malformed layouts, unknown IDs, missing required files, invalid configurations, and conflicting metadata fail with useful paths.
+- Test schema acceptance/rejection and build behavior with small meaningful fixtures. Expected results for synthetic examples are appropriate; duplicating the real catalog or templates as expected results is not.

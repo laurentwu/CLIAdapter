@@ -1,398 +1,180 @@
-import {
-  existsSync,
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  readdirSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
-// @ts-expect-error The production build script is intentionally plain JavaScript.
-import { assertExpectedSourceLayout, collectProviders, generateDirectoryIndexes } from "../scripts/build-dist.mjs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { pathToFileURL } from "node:url";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+// @ts-expect-error The production build utilities intentionally use plain JavaScript.
+import { build, collectProviders, generateDirectoryIndexes } from "../scripts/build-dist.mjs";
+import { addCli, addProvider, createSource, readJson, writeJson } from "./support/fixtures.js";
+import { rootDir } from "./support/repository.js";
 
-const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const distDirectory = join(rootDir, "dist");
+function listFiles(directory: string, base = directory): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? listFiles(path, base) : [relative(base, path)];
+  }).sort();
+}
 
-type ProviderArtifact = {
-  id: string;
-  name: string;
-  env: string[];
-  endpoints: Array<{ protocol: string; url: string }>;
-};
-
-type ProviderFixture = {
-  cli: string;
-  metadata: {
-    id: string;
-    name: string;
-    env: string[];
-    protocol: string;
-    base_url: string;
-  };
-};
-
-const fixtureCliDirectories = [
-  "claude",
-  "codex",
-  "opencode",
-  "pi",
-  "qwen",
-  "kimi",
-  "codebuddy",
-  "crush",
-  "goose",
-];
-
-function createProviderSourceFixture(providers: ProviderFixture[]): string {
-  const root = mkdtempSync(join(tmpdir(), "cli-config-providers-"));
-  writeFileSync(
-    join(root, "api.json"),
-    JSON.stringify({ fixture: { api: "https://api.example.com/v1" } }),
-  );
-  for (const cli of fixtureCliDirectories) {
-    mkdirSync(join(root, cli), { recursive: true });
-  }
-  for (const provider of providers) {
-    const providerDirectory = join(root, provider.cli, provider.metadata.id);
-    mkdirSync(providerDirectory, { recursive: true });
-    writeFileSync(
-      join(providerDirectory, "provider.json"),
-      JSON.stringify(provider.metadata),
-    );
-  }
-  return root;
+function contents(directory: string): Record<string, string> {
+  return Object.fromEntries(listFiles(directory).map((path) => [path, readFileSync(join(directory, path), "utf8")]));
 }
 
 function snapshotDirectory(directory: string): unknown {
   if (!existsSync(directory)) return null;
-
-  const directoryStat = statSync(directory, { bigint: true });
-  const entries = readdirSync(directory, { withFileTypes: true })
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map((entry) => {
-      const entryPath = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        return { name: entry.name, directory: snapshotDirectory(entryPath) };
-      }
-      const fileStat = statSync(entryPath, { bigint: true });
-      return {
-        name: entry.name,
-        size: fileStat.size,
-        inode: String(fileStat.ino),
-        modified: String(fileStat.mtimeNs),
-      };
-    });
-
+  const stats = statSync(directory, { bigint: true });
   return {
-    inode: String(directoryStat.ino),
-    modified: String(directoryStat.mtimeNs),
-    entries,
+    inode: String(stats.ino), modified: String(stats.mtimeNs),
+    entries: readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).map((entry) => {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) return { name: entry.name, directory: snapshotDirectory(path) };
+      const file = statSync(path, { bigint: true });
+      return { name: entry.name, size: file.size, inode: String(file.ino), modified: String(file.mtimeNs) };
+    }),
   };
 }
 
-describe("Pages directory indexes", () => {
-  it("generates a navigable index for every published directory", () => {
-    const root = mkdtempSync(join(tmpdir(), "cli-config-pages-"));
-    try {
-      mkdirSync(join(root, "folder", "nested"), { recursive: true });
-      writeFileSync(join(root, "README & notes.md"), "notes");
-      writeFileSync(join(root, "folder", "config.toml"), "config");
+describe("directory indexes and publishing", () => {
+  let root: string;
+  beforeEach(() => { root = createSource(); });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-      generateDirectoryIndexes(root);
-
-      expect(existsSync(join(root, "index.html"))).toBe(true);
-      expect(existsSync(join(root, "folder", "index.html"))).toBe(true);
-      expect(existsSync(join(root, "folder", "nested", "index.html"))).toBe(true);
-
-      const rootIndex = readFileSync(join(root, "index.html"), "utf8");
-      expect(rootIndex).toContain('href="folder/"');
-      expect(rootIndex).toContain('href="README%20%26%20notes.md"');
-      expect(rootIndex).toContain("README &amp; notes.md");
-      expect(rootIndex).not.toContain(">index.html<");
-
-      const folderIndex = readFileSync(join(root, "folder", "index.html"), "utf8");
-      expect(folderIndex).toContain('href="../"');
-      expect(folderIndex).toContain('href="nested/"');
-      expect(folderIndex).toContain('href="config.toml"');
-
-      const nestedIndex = readFileSync(join(root, "folder", "nested", "index.html"), "utf8");
-      expect(nestedIndex).toContain('<a href="../../">Root</a>');
-      expect(nestedIndex).toContain('<a href="../">folder</a>');
-      expect(nestedIndex).toContain('<span aria-current="page">nested</span>');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  it("generates navigable indexes with breadcrumbs, encoded URLs, and escaped labels", () => {
+    const output = join(root, "preview");
+    mkdirSync(join(output, "folder", "nested"), { recursive: true });
+    writeFileSync(join(output, "README & notes.md"), "notes");
+    writeFileSync(join(output, "folder", "config.toml"), "config");
+    generateDirectoryIndexes(output);
+    const rootIndex = readFileSync(join(output, "index.html"), "utf8");
+    expect(rootIndex).toContain('href="folder/"');
+    expect(rootIndex).toContain('href="README%20%26%20notes.md"');
+    expect(rootIndex).toContain("README &amp; notes.md");
+    expect(rootIndex).not.toContain(">index.html<");
+    const folderIndex = readFileSync(join(output, "folder", "index.html"), "utf8");
+    expect(folderIndex).toContain('href="../"');
+    expect(folderIndex).toContain('href="nested/"');
+    expect(folderIndex).toContain('href="config.toml"');
+    const nestedIndex = readFileSync(join(output, "folder", "nested", "index.html"), "utf8");
+    expect(nestedIndex).toContain('<a href="../../">Root</a>');
+    expect(nestedIndex).toContain('<a href="../">folder</a>');
+    expect(nestedIndex).toContain('<span aria-current="page">nested</span>');
   });
 
-  it("does not run the destructive build when imported", () => {
-    const scriptUrl = pathToFileURL(join(rootDir, "scripts", "build-dist.mjs")).href;
-    const beforeImport = snapshotDirectory(distDirectory);
-    const result = spawnSync(
-      process.execPath,
-      ["--input-type=module", "-e", `await import(${JSON.stringify(scriptUrl)});`],
-      { cwd: rootDir, encoding: "utf8" },
-    );
-    const afterImport = snapshotDirectory(distDirectory);
-
+  it("does not build or change existing output when imported", () => {
+    const output = join(rootDir, "dist");
+    const before = snapshotDirectory(output);
+    const script = pathToFileURL(join(rootDir, "scripts", "build-dist.mjs")).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", "await import(" + JSON.stringify(script) + ");"], { cwd: rootDir, encoding: "utf8" });
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe("");
-    expect(afterImport).toEqual(beforeImport);
+    expect(snapshotDirectory(output)).toEqual(before);
   });
-});
 
-describe("providers artifact", () => {
-  it("aggregates each configured provider and its canonical protocol endpoints", () => {
-    const providers = collectProviders(rootDir) as ProviderArtifact[];
-
-    expect(providers.map((provider) => provider.id)).toEqual([
-      "deepseek",
-      "opencode",
-      "opencode-go",
-      "zai",
-      "zai-coding-plan",
-      "zhipuai",
-      "zhipuai-coding-plan",
-    ]);
-    expect(providers.find((provider) => provider.id === "deepseek")).toEqual({
-      id: "deepseek",
-      name: "DeepSeek",
-      env: ["DEEPSEEK_API_KEY"],
-      endpoints: [
-        {
-          protocol: "anthropic-messages",
-          url: "https://api.deepseek.com/anthropic",
-        },
-        {
-          protocol: "openai-compatible",
-          url: "https://api.deepseek.com",
-        },
-        {
-          protocol: "responses",
-          url: "https://api.deepseek.com",
-        },
-      ],
+  it("aggregates arbitrary providers with different protocol counts, removes duplicates, and sorts output", () => {
+    addCli(root, "z-tool");
+    addProvider(root, "z-tool", "beta");
+    addProvider(root, "z-tool", "alpha", { env: ["Z_KEY", "A_KEY"] });
+    addCli(root, "a-tool");
+    addProvider(root, "a-tool", "alpha", {
+      env: ["A_KEY", "Z_KEY"], protocol: "messages", base_url: "https://alpha.example/messages",
     });
+    addCli(root, "duplicate-tool");
+    addProvider(root, "duplicate-tool", "alpha", { env: ["A_KEY", "Z_KEY"] });
+    expect(collectProviders(root)).toEqual([
+      {
+        id: "alpha", name: "alpha", env: ["A_KEY", "Z_KEY"],
+        endpoints: [
+          { protocol: "messages", url: "https://alpha.example/messages" },
+          { protocol: "openai-compatible", url: "https://alpha.example/v1" },
+        ],
+      },
+      { id: "beta", name: "beta", env: ["BETA_API_KEY"], endpoints: [{ protocol: "openai-compatible", url: "https://beta.example/v1" }] },
+    ]);
+  });
 
+  it("publishes every real source template verbatim at its original URL and excludes source-only files", () => {
+    for (const directory of ["cli", "schemas"]) {
+      cpSync(join(rootDir, directory), join(root, directory), { recursive: true });
+    }
+    for (const file of ["api.json", "pi-provider-map.json", "LICENSE"]) cpSync(join(rootDir, file), join(root, file));
+    writeFileSync(join(root, "notes.md"), "Source-only documentation");
+    const result = build(root);
+    const output = result.directory as string;
+    // This independent source walk does not use the builder's discovered artifact list.
+    const sourceFiles = listFiles(join(root, "cli")).filter((path) =>
+      !path.split("/").includes("schemas") && !path.endsWith("/cli.json"),
+    );
+    const expectedFiles = new Set([...sourceFiles, "LICENSE", "pi-provider-map.json", "providers.json", "index.html"]);
+    for (const path of sourceFiles) {
+      expect(readFileSync(join(output, path)), path).toEqual(readFileSync(join(root, "cli", path)));
+      let parent = dirname(path);
+      while (parent !== ".") {
+        expectedFiles.add(join(parent, "index.html"));
+        parent = dirname(parent);
+      }
+    }
+    expect(listFiles(output)).toEqual([...expectedFiles].sort());
+    for (const file of ["LICENSE", "pi-provider-map.json"]) {
+      expect(readFileSync(join(output, file))).toEqual(readFileSync(join(root, file)));
+    }
+    const metadata = sourceFiles.filter((path) => path.endsWith("/provider.json"))
+      .map((path) => readJson(join(root, "cli", path)));
+    const providers = readJson(join(output, "providers.json")) as unknown as Array<{ id: string; endpoints: Array<{ protocol: string; url: string }> }>;
+    expect(providers.map((provider) => provider.id)).toEqual([...new Set(metadata.map((entry) => entry.id))].sort());
     for (const provider of providers) {
-      expect(provider.endpoints).toHaveLength(3);
-      expect(new Set(provider.endpoints.map(({ protocol }) => protocol)).size).toBe(3);
+      const expectedEndpoints = new Set(metadata.filter((entry) => entry.id === provider.id).map((entry) => entry.protocol + "\n" + entry.base_url));
+      expect(provider.endpoints.map((entry) => entry.protocol + "\n" + entry.url).sort()).toEqual([...expectedEndpoints].sort());
     }
+    const index = readFileSync(join(output, "index.html"), "utf8");
+    expect(index).toContain('href="providers.json"');
+    expect(index).toContain('href="pi-provider-map.json"');
+    const first = contents(output);
+    build(root);
+    expect(contents(output)).toEqual(first);
   });
 
-  it("writes a deterministic root-level providers.json linked from the index", () => {
-    const buildScript = join(rootDir, "scripts", "build-dist.mjs");
-    const sourceProviderMap = readFileSync(join(rootDir, "pi-provider-map.json"), "utf8");
-    const firstBuild = spawnSync(process.execPath, [buildScript], {
-      cwd: rootDir,
-      encoding: "utf8",
-    });
-
-    expect(firstBuild.status).toBe(0);
-    expect(firstBuild.stderr).toBe("");
-    const firstOutput = readFileSync(join(distDirectory, "providers.json"), "utf8");
-    expect(JSON.parse(firstOutput)).toEqual(collectProviders(rootDir));
-    expect(readFileSync(join(distDirectory, "index.html"), "utf8")).toContain(
-      'href="providers.json"',
-    );
-    expect(readFileSync(join(distDirectory, "index.html"), "utf8")).toContain(
-      'href="pi-provider-map.json"',
-    );
-    expect(readFileSync(join(distDirectory, "pi-provider-map.json"), "utf8")).toBe(
-      sourceProviderMap,
-    );
-    expect(existsSync(join(distDirectory, "opencode", "deepseek", "auth.json"))).toBe(
-      true,
-    );
-    expect(
-      readFileSync(join(distDirectory, "opencode", "deepseek", "auth.json"), "utf8"),
-    ).toBe(readFileSync(join(rootDir, "opencode", "deepseek", "auth.json"), "utf8"));
-    expect(
-      existsSync(join(distDirectory, "opencode", "deepseek", "opencode.json")),
-    ).toBe(true);
-    expect(existsSync(join(distDirectory, "opencode", "auth.json"))).toBe(false);
-
-    const claudeSettingsPaths = [
-      "settings.json",
-      "deepseek/settings.json",
-      "opencode/settings.json",
-      "opencode-go/settings.json",
-      "zai/settings.json",
-      "zai-coding-plan/settings.json",
-      "zhipuai/settings.json",
-      "zhipuai-coding-plan/settings.json",
-    ];
-    for (const relativePath of claudeSettingsPaths) {
-      expect(readFileSync(join(distDirectory, "claude", relativePath), "utf8")).toBe(
-        readFileSync(join(rootDir, "claude", relativePath), "utf8"),
-      );
-    }
-
-    const claudeProviderPaths = [
-      "deepseek/provider.json",
-      "opencode/provider.json",
-      "opencode-go/provider.json",
-      "zai/provider.json",
-      "zai-coding-plan/provider.json",
-      "zhipuai/provider.json",
-      "zhipuai-coding-plan/provider.json",
-    ];
-    for (const relativePath of claudeProviderPaths) {
-      expect(readFileSync(join(distDirectory, "claude", relativePath), "utf8")).toBe(
-        readFileSync(join(rootDir, "claude", relativePath), "utf8"),
-      );
-    }
-    expect(existsSync(join(distDirectory, "claude", "schemas"))).toBe(false);
-
-    const piSettingsPaths = [
-      "settings.json",
-      "deepseek/settings.json",
-      "opencode/settings.json",
-      "opencode-go/settings.json",
-      "zai-coding-plan/settings.json",
-      "zhipuai-coding-plan/settings.json",
-      "zai/settings.json",
-      "zhipuai/settings.json",
-    ];
-    for (const relativePath of piSettingsPaths) {
-      expect(readFileSync(join(distDirectory, "pi", relativePath), "utf8")).toBe(
-        readFileSync(join(rootDir, "pi", relativePath), "utf8"),
-      );
-    }
-
-    const nonEmptyPiModelsPaths = [
-      "models.json",
-      "zai/models.json",
-      "zhipuai/models.json",
-    ];
-    for (const relativePath of nonEmptyPiModelsPaths) {
-      expect(readFileSync(join(distDirectory, "pi", relativePath), "utf8")).toBe(
-        readFileSync(join(rootDir, "pi", relativePath), "utf8"),
-      );
-    }
-
-    const builtinPiProviders = [
-      "deepseek",
-      "opencode",
-      "opencode-go",
-      "zai-coding-plan",
-      "zhipuai-coding-plan",
-    ];
-    for (const providerId of builtinPiProviders) {
-      expect(
-        readFileSync(join(distDirectory, "pi", providerId, "auth.json"), "utf8"),
-      ).toBe(readFileSync(join(rootDir, "pi", providerId, "auth.json"), "utf8"));
-      expect(
-        JSON.parse(readFileSync(join(distDirectory, "pi", providerId, "models.json"), "utf8")),
-      ).toEqual({ providers: {} });
-      expect(
-        readFileSync(join(distDirectory, "pi", providerId, "index.html"), "utf8"),
-      ).toContain('href="auth.json"');
-    }
-    for (const providerId of ["zai", "zhipuai"]) {
-      expect(existsSync(join(distDirectory, "pi", providerId, "auth.json"))).toBe(false);
-      expect(
-        Object.keys(
-          JSON.parse(
-            readFileSync(join(distDirectory, "pi", providerId, "models.json"), "utf8"),
-          ).providers,
-        ),
-      ).toHaveLength(1);
-    }
-    expect(existsSync(join(distDirectory, "pi", "auth.json"))).toBe(false);
-    expect(existsSync(join(distDirectory, "pi", "zai-coding-plan"))).toBe(true);
-    expect(existsSync(join(distDirectory, "pi", "zhipuai-coding-plan"))).toBe(true);
-    expect(existsSync(join(distDirectory, "api.json"))).toBe(false);
-    expect(existsSync(join(distDirectory, "Plan.md"))).toBe(false);
-    expect(existsSync(join(distDirectory, "pi", "schemas"))).toBe(false);
-
-    const secondBuild = spawnSync(process.execPath, [buildScript], {
-      cwd: rootDir,
-      encoding: "utf8",
-    });
-    expect(secondBuild.status).toBe(0);
-    expect(secondBuild.stderr).toBe("");
-    expect(readFileSync(join(distDirectory, "providers.json"), "utf8")).toBe(
-      firstOutput,
-    );
-    expect(readFileSync(join(distDirectory, "pi-provider-map.json"), "utf8")).toBe(
-      sourceProviderMap,
-    );
+  it("publishes a newly added CLI and accepts removing a provider without allowlist changes", () => {
+    addCli(root, "brand-new-tool");
+    const provider = addProvider(root, "brand-new-tool", "beta");
+    writeJson(join(provider, "example-model", "models.json"), { models: [{ id: "example-model" }] });
+    const result = build(root);
+    expect(existsSync(join(result.directory, "brand-new-tool", "beta", "example-model", "models.json"))).toBe(true);
+    expect(existsSync(join(result.directory, "cli"))).toBe(false);
+    expect(existsSync(join(result.directory, "brand-new-tool", "cli.json"))).toBe(false);
+    rmSync(provider, { recursive: true });
+    build(root);
+    expect(existsSync(join(result.directory, "brand-new-tool", "beta"))).toBe(false);
+    expect(readJson(join(result.directory, "providers.json"))).toEqual([]);
   });
 
-  it("rejects a missing PI provider map during the source-layout preflight", () => {
-    const root = mkdtempSync(join(tmpdir(), "cli-config-missing-pi-map-"));
-    try {
-      for (const cli of fixtureCliDirectories) mkdirSync(join(root, cli));
-      writeFileSync(join(root, "LICENSE"), "fixture license");
-
-      expect(() => assertExpectedSourceLayout(root)).toThrow(
-        `Expected PI provider map is missing: ${join(root, "pi-provider-map.json")}`,
-      );
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  it.each(["LICENSE", "pi-provider-map.json"])("rejects missing root artifact %s before touching previous output", (file) => {
+    addCli(root);
+    const output = join(root, "dist");
+    mkdirSync(output);
+    writeFileSync(join(output, "keep.txt"), "previous output");
+    rmSync(join(root, file));
+    expect(() => build(root)).toThrow(file);
+    expect(readFileSync(join(output, "keep.txt"), "utf8")).toBe("previous output");
   });
 
-  it("rejects an OpenAI-compatible endpoint that differs from api.json", () => {
-    const root = createProviderSourceFixture([
-      {
-        cli: "claude",
-        metadata: {
-          id: "fixture",
-          name: "Fixture",
-          env: ["FIXTURE_API_KEY"],
-          protocol: "openai-compatible",
-          base_url: "https://api.example.com/v2",
-        },
-      },
-    ]);
-
-    try {
-      expect(() => collectProviders(root)).toThrow(
-        "must use the canonical api.json endpoint",
-      );
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  it("rejects undeclared source files before cleaning previous output", () => {
+    const cli = addCli(root);
+    const output = build(root).directory;
+    const first = contents(output);
+    writeFileSync(join(cli, "unexpected.json"), "{}");
+    expect(() => build(root)).toThrow(/unexpected\.json.*undeclared/);
+    expect(contents(output)).toEqual(first);
   });
 
-  it("rejects inconsistent provider environment metadata", () => {
-    const root = createProviderSourceFixture([
-      {
-        cli: "claude",
-        metadata: {
-          id: "fixture",
-          name: "Fixture",
-          env: ["FIXTURE_API_KEY"],
-          protocol: "anthropic-messages",
-          base_url: "https://api.example.com/anthropic",
-        },
-      },
-      {
-        cli: "codex",
-        metadata: {
-          id: "fixture",
-          name: "Fixture",
-          env: ["OTHER_API_KEY"],
-          protocol: "responses",
-          base_url: "https://api.example.com/v1",
-        },
-      },
-    ]);
-
-    try {
-      expect(() => collectProviders(root)).toThrow(
-        "has inconsistent name or env metadata",
-      );
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  it.each([
+    ["noncanonical endpoint", { base_url: "https://alpha.example/v2" }, /canonical api.json endpoint/],
+    ["inconsistent environment", { env: ["OTHER_KEY"] }, /inconsistent name or env/],
+    ["conflicting protocol endpoint", { protocol: "messages", base_url: "https://alpha.example/other" }, /multiple messages endpoints/],
+  ] as const)("rejects %s", (_label, overrides, error) => {
+    addCli(root, "a-tool");
+    addProvider(root, "a-tool", "alpha", _label === "conflicting protocol endpoint" ? { protocol: "messages", base_url: "https://alpha.example/messages" } : {});
+    addCli(root, "b-tool");
+    addProvider(root, "b-tool", "alpha", overrides);
+    expect(() => collectProviders(root)).toThrow(error);
   });
 });

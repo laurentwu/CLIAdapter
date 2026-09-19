@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "description": "codex configuration templates",
+  "files": {
+    "config.toml": {
+      "description": "Client configuration",
+      "format": "toml",
+      "schema": "schemas/config.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli"
+      ]
+    },
+    "models.json": {
+      "description": "Model and provider configuration",
+      "format": "json",
+      "schema": "schemas/models.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli"
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:repository:provider:v1",
+  "$comment": "Shared provider metadata format. Catalog membership and cross-file endpoint consistency are checked separately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "env", "protocol", "base_url", "docs"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "pattern": "^[^<>/\\\\]+$" },
+    "name": { "type": "string", "minLength": 1 },
+    "env": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "protocol": { "type": "string", "minLength": 1 },
+    "base_url": { "type": "string", "pattern": "^https?://[^\\s]+$" },
+    "docs": { "type": "string", "pattern": "^https?://[^\\s]+$" }
+  }
+}

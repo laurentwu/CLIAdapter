@@ -74,10 +74,6 @@
       "kind": "builtin",
       "provider": "huggingface"
     },
-    "kimi-for-coding": {
-      "kind": "builtin",
-      "provider": "kimi-coding"
-    },
     "minimax": {
       "kind": "builtin",
       "provider": "minimax"

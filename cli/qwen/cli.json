@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "description": "qwen configuration templates",
+  "files": {
+    "settings.json": {
+      "description": "Default settings and model selection",
+      "format": "json",
+      "schema": "schemas/settings.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli"
+      ]
+    }
+  }
+}

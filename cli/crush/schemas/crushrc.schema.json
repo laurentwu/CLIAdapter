@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:crush:commands:v1",
+  "$comment": "The command template is validated as text, not executed. Require registration commands and the credential placeholder without fixing provider IDs or tuning values.",
+  "type": "string",
+  "minLength": 1,
+  "allOf": [
+    {
+      "pattern": "(^|\\n)provider add \\S+ "
+    },
+    {
+      "pattern": "(^|\\n)model add \\S+ "
+    },
+    {
+      "pattern": "--base-url \"(?:<base-url>|https?://[^\\s\"]+)\""
+    },
+    {
+      "pattern": "--api-key \"<your-api-key>\""
+    },
+    {
+      "not": {
+        "pattern": "--api-key (?!\"<your-api-key>\")"
+      }
+    }
+  ]
+}

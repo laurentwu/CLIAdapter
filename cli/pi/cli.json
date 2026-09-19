@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "description": "pi configuration templates",
+  "files": {
+    "auth.json": {
+      "description": "Provider authentication credentials",
+      "format": "json",
+      "schema": "schemas/auth.schema.json",
+      "levels": [
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "provider"
+      ],
+      "providerKinds": [
+        "builtin"
+      ]
+    },
+    "models.json": {
+      "description": "Model and provider configuration",
+      "format": "json",
+      "schema": "schemas/models.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli",
+        "provider"
+      ],
+      "schemasByProviderKind": {
+        "builtin": "schemas/builtin-models.schema.json"
+      }
+    },
+    "settings.json": {
+      "description": "Default settings and model selection",
+      "format": "json",
+      "schema": "schemas/settings.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli",
+        "provider"
+      ]
+    }
+  },
+  "providerMap": "../../pi-provider-map.json"
+}
