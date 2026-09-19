@@ -129,6 +129,49 @@ describe("declarative repository layout", () => {
     expect(() => validateRepository(root)).toThrow(error);
   });
 
+  it("rejects a provider template that references a different provider", () => {
+    writeJson(join(provider, "config.json"), {
+      provider: "beta",
+      model: "<model-id>",
+      apiKey: "<your-api-key>",
+    });
+    expect(() => validateRepository(root)).toThrow(/config\.json.*provider reference.*alpha/);
+  });
+
+  it("rejects a template endpoint outside the provider metadata base URL", () => {
+    const schemaPath = join(cli, "schemas", "config.schema.json");
+    const schema = readJson(schemaPath);
+    schema.properties.baseUrl = { type: "string", pattern: "^https://" };
+    writeJson(schemaPath, schema);
+    writeJson(join(provider, "config.json"), {
+      provider: "alpha",
+      model: "<model-id>",
+      apiKey: "<your-api-key>",
+      baseUrl: "https://beta.example/v1",
+    });
+    expect(() => validateRepository(root)).toThrow(/config\.json.*endpoint.*provider metadata/);
+  });
+
+  it.each([
+    ["provider", (config: any, models: any) => {
+      config.provider = "alpha";
+      models.models[0].id = "<model-id>";
+    }, /CLI templates.*provider placeholder/],
+    ["model", (config: any, models: any) => {
+      config.model = "example-model";
+      models.models[0].id = "example-model";
+    }, /CLI templates.*model placeholder/],
+  ] as const)("rejects a CLI fallback without a %s placeholder", (_label, mutate, error) => {
+    const configPath = join(cli, "config.json");
+    const modelsPath = join(cli, "models.json");
+    const config = readJson(configPath);
+    const models = readJson(modelsPath);
+    mutate(config, models);
+    writeJson(configPath, config);
+    writeJson(modelsPath, models);
+    expect(() => validateRepository(root)).toThrow(error);
+  });
+
   it("reports parsing errors with the template path", () => {
     writeFileSync(join(provider, "config.json"), "{invalid JSON");
     expect(() => validateRepository(root)).toThrow(/alpha.*config\.json/);
@@ -137,6 +180,11 @@ describe("declarative repository layout", () => {
   it("rejects unresolved model placeholders in a model override", () => {
     writeJson(join(provider, "example-model", "models.json"), { models: [{ id: "<model-id>" }] });
     expect(() => validateRepository(root)).toThrow(/models\.json.*concrete model/);
+  });
+
+  it("rejects a model override whose concrete ID differs from its directory", () => {
+    writeJson(join(provider, "example-model", "models.json"), { models: [{ id: "different-model" }] });
+    expect(() => validateRepository(root)).toThrow(/models\.json.*concrete model example-model/);
   });
 
   it("rejects canonical endpoint and metadata mismatches across discovered CLIs", () => {
