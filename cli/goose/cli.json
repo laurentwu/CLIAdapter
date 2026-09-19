@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "description": "goose configuration templates",
+  "files": {
+    "config.yaml": {
+      "description": "Client configuration",
+      "format": "yaml",
+      "schema": "schemas/config.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli"
+      ]
+    },
+    "custom-provider.json": {
+      "description": "Custom provider registration",
+      "format": "json",
+      "schema": "schemas/custom-provider.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli"
+      ]
+    }
+  }
+}

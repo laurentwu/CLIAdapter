@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "description": "opencode configuration templates",
+  "files": {
+    "auth.json": {
+      "description": "Provider authentication credentials",
+      "format": "json",
+      "schema": "schemas/auth.schema.json",
+      "levels": [
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "provider"
+      ]
+    },
+    "opencode.json": {
+      "description": "Default model selection and custom-provider fallback",
+      "format": "json",
+      "schema": "schemas/opencode.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli",
+        "provider"
+      ]
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:repository:cli:v1",
+  "$comment": "Repository file declarations. Describe formats and placement, never a supported provider/model list or current configuration values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "description", "files"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "providerMap": { "type": "string", "pattern": "^\\.\\./\\.\\./[^/\\\\]+\\.json$" },
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+        "not": { "enum": ["cli.json", "provider.json", "schemas", "index.html"] }
+      },
+      "additionalProperties": { "$ref": "#/definitions/File" }
+    }
+  },
+  "definitions": {
+    "Levels": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["cli", "provider", "model"] }
+    },
+    "SchemaPath": { "type": "string", "pattern": "^schemas/[a-zA-Z0-9][a-zA-Z0-9._-]*\\.schema\\.json$" },
+    "File": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "format", "schema", "levels", "requiredAt"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "format": { "enum": ["json", "toml", "yaml", "text"] },
+        "schema": { "$ref": "#/definitions/SchemaPath" },
+        "levels": { "type": "array", "allOf": [{ "$ref": "#/definitions/Levels" }], "minItems": 1 },
+        "requiredAt": { "$ref": "#/definitions/Levels" },
+        "providerKinds": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "enum": ["builtin", "custom"] }
+        },
+        "schemasByProviderKind": {
+          "type": "object", "minProperties": 1,
+          "propertyNames": { "enum": ["builtin", "custom"] },
+          "additionalProperties": { "$ref": "#/definitions/SchemaPath" }
+        }
+      }
+    }
+  }
+}

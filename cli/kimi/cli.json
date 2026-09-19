@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "description": "kimi configuration templates",
+  "files": {
+    "config.toml": {
+      "description": "Client configuration",
+      "format": "toml",
+      "schema": "schemas/config.schema.json",
+      "levels": [
+        "cli",
+        "provider",
+        "model"
+      ],
+      "requiredAt": [
+        "cli"
+      ]
+    }
+  }
+}

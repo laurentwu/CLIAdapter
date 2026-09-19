@@ -2,114 +2,82 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { discoverRepository } from "./repository.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const distDirectory = join(projectRoot, "dist");
-
-const cliDirectories = [
-  "claude",
-  "codex",
-  "opencode",
-  "pi",
-  "qwen",
-  "kimi",
-  "codebuddy",
-  "crush",
-  "goose",
-];
 
 function compareStrings(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function readJson(filePath) {
-  return JSON.parse(readFileSync(filePath, "utf8"));
-}
-
-function collectProviders(sourceRoot = projectRoot) {
-  const apiCatalog = readJson(join(sourceRoot, "api.json"));
+function collectProviders(sourceRoot = projectRoot, repository = discoverRepository(sourceRoot)) {
+  const apiCatalog = repository.catalog;
   const providers = new Map();
 
-  for (const cli of cliDirectories) {
-    const cliDirectory = join(sourceRoot, cli);
-    const providerDirectories = readdirSync(cliDirectory, { withFileTypes: true })
-      .filter(
-        (entry) =>
-          entry.isDirectory() &&
-          existsSync(join(cliDirectory, entry.name, "provider.json")),
-      )
-      .sort((left, right) => compareStrings(left.name, right.name));
+  for (const entry of repository.providers) {
+    const providerPath = entry.metadataPath;
+    const provider = entry.metadata;
 
-    for (const providerDirectory of providerDirectories) {
-      const providerPath = join(
-        cliDirectory,
-        providerDirectory.name,
-        "provider.json",
+    if (provider.id !== entry.providerId) {
+      throw new Error(
+        `${relative(sourceRoot, providerPath)} id must match its directory name`,
       );
-      const provider = readJson(providerPath);
-
-      if (provider.id !== providerDirectory.name) {
-        throw new Error(
-          `${relative(sourceRoot, providerPath)} id must match its directory name`,
-        );
-      }
-      if (!apiCatalog[provider.id]) {
-        throw new Error(`${provider.id} must be a provider id in api.json`);
-      }
-      if (
-        typeof provider.name !== "string" ||
-        !Array.isArray(provider.env) ||
-        !provider.env.every((value) => typeof value === "string") ||
-        typeof provider.protocol !== "string" ||
-        typeof provider.base_url !== "string"
-      ) {
-        throw new Error(
-          `${relative(sourceRoot, providerPath)} has invalid provider metadata`,
-        );
-      }
-      if (
-        provider.protocol === "openai-compatible" &&
-        provider.base_url !== apiCatalog[provider.id].api
-      ) {
-        throw new Error(
-          `${relative(sourceRoot, providerPath)} must use the canonical api.json endpoint`,
-        );
-      }
-
-      const existing = providers.get(provider.id);
-      if (!existing) {
-        providers.set(provider.id, {
-          id: provider.id,
-          name: provider.name,
-          env: [...provider.env].sort(compareStrings),
-          endpoints: new Map([[provider.protocol, provider.base_url]]),
-        });
-        continue;
-      }
-
-      const normalizedEnv = [...provider.env].sort(compareStrings);
-      if (
-        existing.name !== provider.name ||
-        JSON.stringify(existing.env) !== JSON.stringify(normalizedEnv)
-      ) {
-        throw new Error(`${provider.id} has inconsistent name or env metadata`);
-      }
-
-      const existingUrl = existing.endpoints.get(provider.protocol);
-      if (existingUrl && existingUrl !== provider.base_url) {
-        throw new Error(
-          `${provider.id} has multiple ${provider.protocol} endpoints: ${existingUrl}, ${provider.base_url}`,
-        );
-      }
-      existing.endpoints.set(provider.protocol, provider.base_url);
     }
+    if (!apiCatalog[provider.id]) {
+      throw new Error(`${provider.id} must be a provider id in api.json`);
+    }
+    if (
+      typeof provider.name !== "string" ||
+      !Array.isArray(provider.env) ||
+      !provider.env.every((value) => typeof value === "string") ||
+      typeof provider.protocol !== "string" ||
+      typeof provider.base_url !== "string"
+    ) {
+      throw new Error(
+        `${relative(sourceRoot, providerPath)} has invalid provider metadata`,
+      );
+    }
+    if (
+      provider.protocol === "openai-compatible" &&
+      provider.base_url !== apiCatalog[provider.id].api
+    ) {
+      throw new Error(
+        `${relative(sourceRoot, providerPath)} must use the canonical api.json endpoint`,
+      );
+    }
+
+    const existing = providers.get(provider.id);
+    if (!existing) {
+      providers.set(provider.id, {
+        id: provider.id,
+        name: provider.name,
+        env: [...provider.env].sort(compareStrings),
+        endpoints: new Map([[provider.protocol, provider.base_url]]),
+      });
+      continue;
+    }
+
+    const normalizedEnv = [...provider.env].sort(compareStrings);
+    if (
+      existing.name !== provider.name ||
+      JSON.stringify(existing.env) !== JSON.stringify(normalizedEnv)
+    ) {
+      throw new Error(`${provider.id} has inconsistent name or env metadata`);
+    }
+
+    const existingUrl = existing.endpoints.get(provider.protocol);
+    if (existingUrl && existingUrl !== provider.base_url) {
+      throw new Error(
+        `${provider.id} has multiple ${provider.protocol} endpoints: ${existingUrl}, ${provider.base_url}`,
+      );
+    }
+    existing.endpoints.set(provider.protocol, provider.base_url);
   }
 
   return [...providers.values()]
@@ -126,15 +94,6 @@ function collectProviders(sourceRoot = projectRoot) {
             compareStrings(left.url, right.url),
         ),
     }));
-}
-
-function isPublishableSource(sourcePath) {
-  const sourceRelativePath = relative(projectRoot, sourcePath);
-  if (!sourceRelativePath) return true;
-
-  const pathParts = sourceRelativePath.split(sep);
-  const basename = pathParts.at(-1);
-  return basename !== "api.json" && !pathParts.includes("schemas");
 }
 
 function escapeHtml(value) {
@@ -261,83 +220,43 @@ function generateDirectoryIndexes(distRoot) {
 }
 
 function assertExpectedSourceLayout(sourceRoot = projectRoot) {
-  for (const cli of cliDirectories) {
-    const sourceDirectory = join(sourceRoot, cli);
-    if (!existsSync(sourceDirectory)) {
-      throw new Error(`Expected CLI directory is missing: ${cli}`);
+  const repository = discoverRepository(sourceRoot);
+  for (const fileName of ["LICENSE", "pi-provider-map.json"]) {
+    if (!existsSync(join(sourceRoot, fileName))) {
+      throw new Error(`Required root artifact is missing: ${join(sourceRoot, fileName)}`);
     }
   }
-  if (!existsSync(join(sourceRoot, "LICENSE"))) {
-    throw new Error("Expected LICENSE file is missing");
-  }
-  const providerMapPath = join(sourceRoot, "pi-provider-map.json");
-  if (!existsSync(providerMapPath)) {
-    throw new Error(`Expected PI provider map is missing: ${providerMapPath}`);
-  }
+  return repository;
 }
 
-function assertPublishedBoundary() {
-  const unexpectedPaths = [];
-  for (const directory of collectDirectories(distDirectory)) {
-    const relativeDirectory = relative(distDirectory, directory);
-    if (relativeDirectory.split(sep).includes("schemas")) {
-      unexpectedPaths.push(relativeDirectory);
-    }
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name === "api.json") {
-        unexpectedPaths.push(join(relativeDirectory, entry.name));
-      }
-    }
-  }
-  if (unexpectedPaths.length > 0) {
-    throw new Error(`dist contains forbidden published paths: ${unexpectedPaths.join(", ")}`);
-  }
+function build(sourceRoot = projectRoot) {
+  sourceRoot = resolve(sourceRoot);
+  const repository = assertExpectedSourceLayout(sourceRoot);
+  const providers = collectProviders(sourceRoot, repository);
+  const outputDirectory = join(sourceRoot, "dist");
+  // Finish source validation before removing any previous output.
+  rmSync(outputDirectory, { recursive: true, force: true });
+  mkdirSync(outputDirectory, { recursive: true });
 
-  const missingIndexes = collectDirectories(distDirectory).filter(
-    (directory) => !existsSync(join(directory, "index.html")),
-  );
-  if (missingIndexes.length > 0) {
-    throw new Error(
-      `Every published directory must contain index.html: ${missingIndexes.join(", ")}`,
-    );
+  for (const cli of repository.clis) mkdirSync(join(outputDirectory, cli.id));
+  for (const artifact of repository.artifacts) {
+    const target = join(outputDirectory, artifact.publishedPath);
+    mkdirSync(dirname(target), { recursive: true });
+    cpSync(artifact.sourcePath, target);
   }
-}
-
-function build() {
-  assertExpectedSourceLayout();
-
-  const resolvedDistDirectory = resolve(distDirectory);
-  if (resolvedDistDirectory !== join(resolve(projectRoot), "dist")) {
-    throw new Error("Refusing to clean an unexpected dist path");
+  for (const fileName of ["LICENSE", "pi-provider-map.json"]) {
+    cpSync(join(sourceRoot, fileName), join(outputDirectory, fileName));
   }
-  rmSync(distDirectory, { recursive: true, force: true });
-  mkdirSync(distDirectory, { recursive: true });
-
-  for (const cli of cliDirectories) {
-    cpSync(join(projectRoot, cli), join(distDirectory, cli), {
-      recursive: true,
-      filter: isPublishableSource,
-    });
-  }
-  cpSync(join(projectRoot, "LICENSE"), join(distDirectory, "LICENSE"));
-  cpSync(
-    join(projectRoot, "pi-provider-map.json"),
-    join(distDirectory, "pi-provider-map.json"),
-  );
-  const providers = collectProviders();
   writeFileSync(
-    join(distDirectory, "providers.json"),
+    join(outputDirectory, "providers.json"),
     `${JSON.stringify(providers, null, 2)}\n`,
   );
-
-  generateDirectoryIndexes(distDirectory);
-  assertPublishedBoundary();
-  console.log(
-    `Built ${cliDirectories.length} CLI template trees and ${providers.length} providers in dist/`,
-  );
+  generateDirectoryIndexes(outputDirectory);
+  return { directory: outputDirectory, cliCount: repository.clis.length, providerCount: providers.length };
 }
 
 export {
+  build,
   assertExpectedSourceLayout,
   collectDirectories,
   collectProviders,
@@ -349,4 +268,7 @@ export {
 const invokedScript = process.argv[1]
   ? pathToFileURL(resolve(process.argv[1])).href === import.meta.url
   : false;
-if (invokedScript) build();
+if (invokedScript) {
+  const result = build();
+  console.log(`Built ${result.cliCount} CLI template trees and ${result.providerCount} providers in dist/`);
+}

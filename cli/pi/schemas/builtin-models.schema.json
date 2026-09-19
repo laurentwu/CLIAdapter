@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:cli-config:pi:builtin-models:v1",
+  "$comment": "Builtin providers need an empty provider-level file to block the generic custom-provider fallback; no provider identities are enumerated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["providers"],
+  "properties": {
+    "providers": { "type": "object", "maxProperties": 0 }
+  }
+}
