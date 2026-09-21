@@ -5,6 +5,7 @@ import { Ajv, type AnySchema, type ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { parse as parseToml } from "smol-toml";
 import { parse as parseYaml } from "yaml";
+import { parse as parseJsonc, printParseErrorCode, type ParseError } from "jsonc-parser";
 // @ts-expect-error Build utilities are dependency-free JavaScript.
 import { discoverRepository as discover, readJson, schemaPaths } from "../../scripts/repository.mjs";
 
@@ -18,7 +19,7 @@ export type Template = {
   providerId?: string;
   modelId?: string;
   level: "cli" | "provider" | "model";
-  format: "json" | "toml" | "yaml" | "text";
+  format: "json" | "jsonc" | "toml" | "yaml" | "text";
   schemaPath: string;
 };
 export type Repository = {
@@ -103,6 +104,20 @@ export function parseTemplate(template: Template): unknown {
   try {
     switch (template.format) {
       case "json": return JSON.parse(text);
+      case "jsonc": {
+        const errors: ParseError[] = [];
+        const value = parseJsonc(text, errors, {
+          disallowComments: false,
+          allowTrailingComma: true,
+          allowEmptyContent: false,
+        });
+        // The parser can recover a value from malformed input; errors must still fail validation.
+        if (errors.length) {
+          const first = errors[0];
+          throw new Error(`${printParseErrorCode(first.error)} at offset ${first.offset}`);
+        }
+        return value;
+      }
       case "toml": return parseToml(text);
       case "yaml": return parseYaml(text);
       case "text": return text;
@@ -114,6 +129,10 @@ export function parseTemplate(template: Template): unknown {
 
 function validatePlaceholders(value: unknown, path: string): void {
   if (!value || typeof value !== "object") return;
+  const credential = asObject(value);
+  if (credential?.type === "api" && Object.hasOwn(credential, "key") && credential.key !== "<your-api-key>") {
+    throw new Error(`${path}.key: must use <your-api-key>`);
+  }
   for (const [key, child] of Object.entries(value)) {
     if (/^(apiKey|api_key|experimental_bearer_token)$/.test(key) || /_(API_KEY|AUTH_TOKEN)$/.test(key)) {
       if (child !== "<your-api-key>") throw new Error(`${path}.${key}: must use <your-api-key>`);
@@ -255,7 +274,7 @@ function validateProviderTemplateRelations(
     }
   }
 
-  if (template.fileName === "opencode.json" && typeof object.model === "string" &&
+  if (template.fileName === "opencode.jsonc" && typeof object.model === "string" &&
       !object.model.startsWith(`${provider.providerId}/`)) {
     throw new Error(`${template.sourcePath}: model must use provider ${provider.providerId}`);
   }

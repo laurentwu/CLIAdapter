@@ -3,20 +3,22 @@
   "description": "opencode configuration templates",
   "files": {
     "auth.json": {
-      "description": "Provider authentication credentials",
+      "description": "Separate API credentials for generic and provider configurations",
       "format": "json",
       "schema": "schemas/auth.schema.json",
       "levels": [
+        "cli",
         "provider",
         "model"
       ],
       "requiredAt": [
+        "cli",
         "provider"
       ]
     },
-    "opencode.json": {
-      "description": "Default model selection and custom-provider fallback",
-      "format": "json",
+    "opencode.jsonc": {
+      "description": "Default model selection and custom-provider fallback with separate credentials",
+      "format": "jsonc",
       "schema": "schemas/opencode.schema.json",
       "levels": [
         "cli",
