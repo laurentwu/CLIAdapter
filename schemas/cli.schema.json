@@ -33,7 +33,7 @@
       "required": ["description", "format", "schema", "levels", "requiredAt"],
       "properties": {
         "description": { "type": "string", "minLength": 1 },
-        "format": { "enum": ["json", "toml", "yaml", "text"] },
+        "format": { "enum": ["json", "jsonc", "toml", "yaml", "text"] },
         "schema": { "$ref": "#/definitions/SchemaPath" },
         "levels": { "type": "array", "allOf": [{ "$ref": "#/definitions/Levels" }], "minItems": 1 },
         "requiredAt": { "$ref": "#/definitions/Levels" },

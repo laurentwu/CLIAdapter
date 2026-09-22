@@ -4,10 +4,169 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // @ts-expect-error Build utilities are dependency-free JavaScript.
 import { resolveTemplate } from "../scripts/repository.mjs";
 import { addCli, addProvider, createSource, readJson, writeJson } from "./support/fixtures.js";
-import { validateRepository } from "./support/repository.js";
+import { parseTemplate, SchemaRegistry, validateRepository, type JsonObject } from "./support/repository.js";
+
+function assertSeparateCredentials(config: JsonObject, auth: JsonObject): void {
+  expect(Object.keys(auth).sort()).toEqual(Object.keys(config.provider).sort());
+  for (const provider of Object.values(config.provider) as JsonObject[]) {
+    expect(provider.options).not.toHaveProperty("apiKey");
+  }
+  for (const credential of Object.values(auth) as JsonObject[]) {
+    expect(credential.type).toBe("api");
+    expect(credential.key).toBe("<your-api-key>");
+  }
+}
 
 it("validates every discovered repository template, declaration, metadata file, and local Schema offline", () => {
   expect(() => validateRepository()).not.toThrow();
+});
+
+it("pairs discovered OpenCode-format generic templates with separate credentials", () => {
+  const repository = validateRepository();
+  for (const cli of repository.clis) {
+    const files = cli.declaration.files;
+    if (!files["opencode.jsonc"] || !files["auth.json"]) continue;
+    const templates = repository.templates.filter((entry) => entry.cliId === cli.id && entry.level === "cli");
+    const config = templates.find((entry) => entry.fileName === "opencode.jsonc")!;
+    const auth = templates.find((entry) => entry.fileName === "auth.json")!;
+    expect(config, cli.directory).toBeDefined();
+    expect(auth, cli.directory).toBeDefined();
+    expect(config.format).toBe("jsonc");
+    expect(auth.format).toBe("json");
+    for (const name of ["opencode.jsonc", "auth.json"]) {
+      expect(files[name].levels).toEqual(expect.arrayContaining(["cli", "provider", "model"]));
+      expect(files[name].requiredAt).toEqual(expect.arrayContaining(["cli", "provider"]));
+    }
+    assertSeparateCredentials(parseTemplate(config) as JsonObject, parseTemplate(auth) as JsonObject);
+
+    const registry = new SchemaRegistry(cli.schemaPaths);
+    expect(() => registry.validate(config.schemaPath, { model: "alpha/example-model" })).not.toThrow();
+    expect(() => registry.validate(config.schemaPath, { model: 42 })).toThrow(/string/);
+    expect(() => registry.validate(auth.schemaPath, { alpha: { type: "api", key: "<your-api-key>" } })).not.toThrow();
+    expect(() => registry.validate(auth.schemaPath, { alpha: { type: "api" } })).toThrow(/required/);
+    expect(() => registry.validate(auth.schemaPath, { alpha: { type: "oauth", key: "<your-api-key>" } })).toThrow(/constant/);
+  }
+});
+
+it("detects mismatched generic credential identities and inline credentials", () => {
+  const config = { provider: { example: { options: {} } } };
+  const credential = { type: "api", key: "<your-api-key>" };
+  expect(() => assertSeparateCredentials(config, { example: credential })).not.toThrow();
+  expect(() => assertSeparateCredentials(config, { other: credential })).toThrow();
+  expect(() => assertSeparateCredentials({ provider: { example: { options: { apiKey: "<your-api-key>" } } } }, { example: credential })).toThrow();
+});
+
+describe("separate JSONC configurations and API credentials", () => {
+  let root: string;
+  let cli: string;
+  let provider: string;
+  beforeEach(() => {
+    root = createSource();
+    cli = addCli(root);
+    provider = addProvider(root);
+    const declaration = readJson(join(cli, "cli.json"));
+    declaration.files["opencode.jsonc"] = {
+      ...declaration.files["config.json"], format: "jsonc", requiredAt: ["cli", "provider"],
+    };
+    delete declaration.files["config.json"];
+    declaration.files["auth.json"] = {
+      description: "Independent API credentials", format: "json", schema: "schemas/auth.schema.json",
+      levels: ["cli", "provider", "model"], requiredAt: ["cli", "provider"],
+    };
+    writeJson(join(cli, "cli.json"), declaration);
+    writeJson(join(cli, "schemas", "config.schema.json"), {
+      $id: "urn:test:separate:config", $comment: "Independent model selection format",
+      type: "object", additionalProperties: false, required: ["model"],
+      properties: { model: { type: "string" }, key: { type: "string" }, type: { type: "string" } },
+    });
+    writeJson(join(cli, "schemas", "auth.schema.json"), {
+      $id: "urn:test:separate:auth", $comment: "Independent API credential format",
+      type: "object", minProperties: 1,
+      additionalProperties: {
+        type: "object", additionalProperties: false, required: ["type", "key"],
+        properties: { type: { const: "api" }, key: { type: "string" } },
+      },
+    });
+    for (const [directory, identity] of [[cli, "<provider-id>"], [provider, "alpha"]]) {
+      rmSync(join(directory, "config.json"));
+      writeJson(join(directory, "opencode.jsonc"), { model: `${identity}/<model-id>` });
+      writeJson(join(directory, "auth.json"), { [identity]: { type: "api", key: "<your-api-key>" } });
+    }
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it.each(["cli", "provider"])("requires physical credentials at %s level", (level) => {
+    expect(() => validateRepository(root)).not.toThrow();
+    const path = join(level === "cli" ? cli : provider, "auth.json");
+    rmSync(path);
+    expect(() => validateRepository(root)).toThrow(path);
+    expect(() => validateRepository(root)).toThrow(/required/);
+  });
+
+  it.each(["cli", "provider"])("rejects a missing or obsolete configuration at %s level", (level) => {
+    const directory = level === "cli" ? cli : provider;
+    rmSync(join(directory, "opencode.jsonc"));
+    expect(() => validateRepository(root)).toThrow(/opencode\.jsonc.*required/);
+    writeJson(join(directory, "opencode.json"), {});
+    expect(() => validateRepository(root)).toThrow(/opencode\.json.*undeclared/);
+  });
+
+  it.each(["provider", "model"])("checks configuration and credential identities at %s level", (level) => {
+    const directory = level === "provider" ? provider : join(provider, "example-model");
+    const modelId = level === "provider" ? "<model-id>" : "example-model";
+    if (level === "model") writeJson(join(directory, "models.json"), { models: [{ id: modelId }] });
+    writeJson(join(directory, "opencode.jsonc"), { model: `beta/${modelId}` });
+    expect(() => validateRepository(root)).toThrow(/opencode\.jsonc.*model must use provider alpha/);
+    writeJson(join(directory, "opencode.jsonc"), { model: `alpha/${modelId}` });
+    writeJson(join(directory, "auth.json"), { beta: { type: "api", key: "<your-api-key>" } });
+    expect(() => validateRepository(root)).toThrow(/auth\.json.*credentials must use provider identity alpha/);
+    writeJson(join(directory, "auth.json"), { alpha: { type: "api", key: "<your-api-key>" } });
+    expect(() => validateRepository(root)).not.toThrow();
+  });
+
+  it.each(["", "not-the-placeholder"])("rejects the API credential key %j", (key) => {
+    for (const [directory, identity] of [[cli, "<provider-id>"], [provider, "alpha"]]) {
+      const path = join(directory, "auth.json");
+      writeJson(path, { [identity]: { type: "api", key } });
+      expect(() => validateRepository(root)).toThrow(path);
+      expect(() => validateRepository(root)).toThrow(/\.key: must use <your-api-key>/);
+      writeJson(path, { [identity]: { type: "api", key: "<your-api-key>" } });
+    }
+  });
+
+  it("does not treat ordinary key fields as API credentials", () => {
+    writeJson(join(provider, "opencode.jsonc"), { model: "alpha/<model-id>", type: "setting", key: "ordinary-name" });
+    expect(() => validateRepository(root)).not.toThrow();
+  });
+
+  it("resolves partial configuration and credential overrides independently", () => {
+    const model = join(provider, "example-model");
+    writeJson(join(model, "models.json"), { models: [{ id: "example-model" }] });
+    writeJson(join(model, "opencode.jsonc"), { model: "alpha/example-model" });
+    let repository = validateRepository(root);
+    const resolveFile = (name: string) => resolveTemplate(repository, "sample-tool", "alpha", "example-model", name);
+    expect(resolveFile("opencode.jsonc").level).toBe("model");
+    expect(resolveFile("auth.json").level).toBe("provider");
+    rmSync(join(model, "opencode.jsonc"));
+    writeJson(join(model, "auth.json"), { alpha: { type: "api", key: "<your-api-key>" } });
+    repository = validateRepository(root);
+    expect(resolveFile("opencode.jsonc").level).toBe("provider");
+    expect(resolveFile("auth.json").level).toBe("model");
+
+    // Only this synthetic declaration permits provider files to be absent.
+    const declaration = readJson(join(cli, "cli.json"));
+    for (const name of ["opencode.jsonc", "auth.json"]) {
+      declaration.files[name].requiredAt = ["cli"];
+      rmSync(join(provider, name));
+    }
+    writeJson(join(cli, "cli.json"), declaration);
+    repository = validateRepository(root);
+    expect(resolveFile("opencode.jsonc").level).toBe("cli");
+    expect(resolveFile("auth.json").level).toBe("model");
+    rmSync(join(model, "auth.json"));
+    repository = validateRepository(root);
+    expect(resolveFile("auth.json").level).toBe("cli");
+  });
 });
 
 describe("declarative repository layout", () => {

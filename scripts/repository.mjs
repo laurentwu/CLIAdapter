@@ -85,7 +85,7 @@ export function discoverRepository(sourceRoot, { validateDeclaration = () => {} 
           ["cli.json", "provider.json", "schemas", "index.html"].includes(fileName)) {
         fail(declarationPath, `invalid or reserved template filename ${fileName}`);
       }
-      if (!rule || !["json", "toml", "yaml", "text"].includes(rule.format) ||
+      if (!rule || !["json", "jsonc", "toml", "yaml", "text"].includes(rule.format) ||
           !Array.isArray(rule.levels) || !rule.levels.length ||
           rule.levels.some((level) => !["cli", "provider", "model"].includes(level)) ||
           !Array.isArray(rule.requiredAt)) {
