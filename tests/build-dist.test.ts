@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -98,6 +98,7 @@ describe("directory indexes and publishing", () => {
     }
     for (const file of ["api.json", "pi-provider-map.json", "LICENSE"]) cpSync(join(rootDir, file), join(root, file));
     writeFileSync(join(root, "notes.md"), "Source-only documentation");
+    writeFileSync(join(root, "Plan.md"), "Source-only implementation plan");
     const result = build(root);
     const output = result.directory as string;
     // This independent source walk does not use the builder's discovered artifact list.
@@ -107,6 +108,9 @@ describe("directory indexes and publishing", () => {
     const expectedFiles = new Set([...sourceFiles, "LICENSE", "pi-provider-map.json", "providers.json", "index.html"]);
     for (const path of sourceFiles) {
       expect(readFileSync(join(output, path)), path).toEqual(readFileSync(join(root, "cli", path)));
+      if (path.endsWith("/opencode.jsonc")) {
+        expect(existsSync(join(output, path.slice(0, -1))), path).toBe(false);
+      }
       let parent = dirname(path);
       while (parent !== ".") {
         expectedFiles.add(join(parent, "index.html"));
@@ -145,6 +149,45 @@ describe("directory indexes and publishing", () => {
     build(root);
     expect(existsSync(join(result.directory, "brand-new-tool", "beta"))).toBe(false);
     expect(readJson(join(result.directory, "providers.json"))).toEqual([]);
+  });
+
+  it("publishes JSONC verbatim and removes obsolete JSON files and links after migration", () => {
+    const cli = addCli(root, "commented-tool");
+    const provider = addProvider(root, "commented-tool");
+    const model = join(provider, "example-model");
+    writeJson(join(model, "config.json"), { provider: "alpha", model: "example-model", apiKey: "<your-api-key>" });
+    const declaration = readJson(join(cli, "cli.json"));
+    declaration.files["opencode.json"] = declaration.files["config.json"];
+    delete declaration.files["config.json"];
+    writeJson(join(cli, "cli.json"), declaration);
+    const directories = [cli, provider, model];
+    for (const directory of directories) {
+      renameSync(join(directory, "config.json"), join(directory, "opencode.json"));
+    }
+    const output = build(root).directory;
+    for (const directory of directories) {
+      const published = join(output, relative(join(root, "cli"), directory));
+      expect(existsSync(join(published, "opencode.json"))).toBe(true);
+    }
+
+    declaration.files["opencode.jsonc"] = { ...declaration.files["opencode.json"], format: "jsonc" };
+    delete declaration.files["opencode.json"];
+    writeJson(join(cli, "cli.json"), declaration);
+    for (const directory of directories) {
+      const previous = join(directory, "opencode.json");
+      const text = readFileSync(previous, "utf8");
+      rmSync(previous);
+      writeFileSync(join(directory, "opencode.jsonc"), `// Preserve this comment and whitespace.\n${text.replace(/}\s*$/, ",\n}\n")}`);
+    }
+    build(root);
+    for (const directory of directories) {
+      const published = join(output, relative(join(root, "cli"), directory));
+      expect(readFileSync(join(published, "opencode.jsonc"))).toEqual(readFileSync(join(directory, "opencode.jsonc")));
+      expect(existsSync(join(published, "opencode.json"))).toBe(false);
+      const index = readFileSync(join(published, "index.html"), "utf8");
+      expect(index).toContain('href="opencode.jsonc"');
+      expect(index).not.toContain('href="opencode.json"');
+    }
   });
 
   it.each(["LICENSE", "pi-provider-map.json"])("rejects missing root artifact %s before touching previous output", (file) => {
